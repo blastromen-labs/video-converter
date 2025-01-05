@@ -28,7 +28,16 @@ const adjustments = ref({
   shadows: 128,
   brightness: 128,
   hue: 128,
-  saturation: 128
+  saturation: 128,
+  colorize: {
+    enabled: false,
+    color: '#42b883', // Default color (the Vue green)
+    intensity: 50     // 0-100 scale
+  },
+  colorReduce: {
+    enabled: false,
+    levels: 2, // 2 for black/white, can go up to 256 for full color
+  }
 })
 
 // Add trim settings
@@ -162,49 +171,15 @@ const resizeVideo = (file) => {
 
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         const data = imageData.data
-
-        // Create Uint8Array for the frame
         const frameData = new Uint8Array(canvas.width * canvas.height * 3)
         let frameIndex = 0
 
         for (let i = 0; i < data.length; i += 4) {
-          // Convert RGB to HSL and apply color adjustments
-          let [h, s, l] = rgbToHsl(data[i], data[i + 1], data[i + 2])
-
-          // Apply hue adjustment (-180 to +180 degrees)
-          h += (adjustments.value.hue - 128) * 1.4
-          h = (h + 360) % 360
-
-          // Apply saturation adjustment
-          s *= adjustments.value.saturation / 128
-          s = Math.max(0, Math.min(100, s))
-
-          // Convert back to RGB
-          let [r, g, b] = hslToRgb(h, s, l)
-
-          // Apply other adjustments to each channel
-          for (let j = 0; j < 3; j++) {
-            let value = j === 0 ? r : j === 1 ? g : b
-
-            // Apply brightness
-            value += (adjustments.value.brightness - 128)
-
-            // Apply contrast
-            value = ((value - 128) * (adjustments.value.contrast / 128)) + 128
-
-            // Apply highlights to bright areas
-            if (value > 128) {
-              value += (adjustments.value.highlights - 128) * ((value - 128) / 128)
-            }
-
-            // Apply shadows to dark areas
-            if (value < 128) {
-              value += (adjustments.value.shadows - 128) * ((128 - value) / 128)
-            }
-
-            // Store directly in Uint8Array
-            frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(value)))
-          }
+          // Use processPixel instead of inline processing
+          const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
+          frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(r)))
+          frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(g)))
+          frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(b)))
         }
 
         frames.push(frameData)
@@ -295,7 +270,6 @@ const updatePreview = async () => {
 
   const ctx = previewCanvas.value.getContext('2d', { willReadFrequently: true })
 
-  // Fix parameter order
   const crop = cropToAspectRatio(
     videoPreview.value.videoWidth,
     videoPreview.value.videoHeight,
@@ -313,42 +287,11 @@ const updatePreview = async () => {
   const data = imageData.data
 
   for (let i = 0; i < data.length; i += 4) {
-    // Convert RGB to HSL
-    let [h, s, l] = rgbToHsl(data[i], data[i + 1], data[i + 2])
-
-    // Apply hue adjustment (-180 to +180 degrees)
-    h += (adjustments.value.hue - 128) * 1.4
-    h = (h + 360) % 360
-
-    // Apply saturation adjustment
-    s *= adjustments.value.saturation / 128
-    s = Math.max(0, Math.min(100, s))
-
-    // Convert back to RGB
-    let [r, g, b] = hslToRgb(h, s, l)
-
-    // Apply other adjustments to each channel
-    for (let j = 0; j < 3; j++) {
-      let value = j === 0 ? r : j === 1 ? g : b
-
-      // Apply brightness
-      value += (adjustments.value.brightness - 128)
-
-      // Apply contrast
-      value = ((value - 128) * (adjustments.value.contrast / 128)) + 128
-
-      // Apply highlights to bright areas
-      if (value > 128) {
-        value += (adjustments.value.highlights - 128) * ((value - 128) / 128)
-      }
-
-      // Apply shadows to dark areas
-      if (value < 128) {
-        value += (adjustments.value.shadows - 128) * ((128 - value) / 128)
-      }
-
-      data[i + j] = Math.max(0, Math.min(255, value))
-    }
+    // Use processPixel instead of inline processing
+    const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
+    data[i] = r
+    data[i + 1] = g
+    data[i + 2] = b
     data[i + 3] = 255
   }
 
@@ -476,7 +419,16 @@ const DEFAULT_SETTINGS = {
     shadows: 128,
     brightness: 128,
     hue: 128,
-    saturation: 128
+    saturation: 128,
+    colorize: {
+      enabled: false,
+      color: '#42b883',
+      intensity: 50
+    },
+    colorReduce: {
+      enabled: false,
+      levels: 2
+    }
   },
   trim: {
     start: 0,
@@ -515,8 +467,98 @@ const resetTrimTimes = () => {
 const handleNewFile = () => {
   fileInput.value?.click()
 }
-</script>
 
+// Helper function to blend colors
+const blendColors = (rgb1, rgb2, intensity) => {
+  const blend = intensity / 100
+  return [
+    rgb1[0] * (1 - blend) + rgb2[0] * blend,
+    rgb1[1] * (1 - blend) + rgb2[1] * blend,
+    rgb1[2] * (1 - blend) + rgb2[2] * blend
+  ]
+}
+
+// Helper function to convert hex to RGB
+const hexToRgb = (hex) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result ? [
+    parseInt(result[1], 16),
+    parseInt(result[2], 16),
+    parseInt(result[3], 16)
+  ] : [0, 0, 0]
+}
+
+// Update the image processing in updatePreview and resizeVideo
+const processPixel = (r, g, b) => {
+  // Initialize variables
+  let rr = r, gg = g, bb = b
+
+  // Apply color reduction first if enabled and level is 1
+  if (adjustments.value.colorReduce.enabled && adjustments.value.colorReduce.levels === 1) {
+    // Calculate luminance from original RGB values
+    const luminance = Math.round(r * 0.299 + g * 0.587 + b * 0.114)
+    return [luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0]
+  }
+
+  // Convert RGB to HSL and apply adjustments
+  const [h, s, l] = rgbToHsl(rr, gg, bb)
+
+  // Apply hue adjustment
+  let newH = h + (adjustments.value.hue - 128) * 1.4
+  newH = (newH + 360) % 360
+
+  // Apply saturation adjustment
+  let newS = s * (adjustments.value.saturation / 128)
+  newS = Math.max(0, Math.min(100, newS))
+
+  // Convert back to RGB
+  const [r1, g1, b1] = hslToRgb(newH, newS, l)
+  rr = r1
+  gg = g1
+  bb = b1
+
+  // Apply other adjustments
+  for (let j = 0; j < 3; j++) {
+    let value = j === 0 ? rr : j === 1 ? gg : bb
+
+    value += (adjustments.value.brightness - 128)
+    value = ((value - 128) * (adjustments.value.contrast / 128)) + 128
+
+    if (value > 128) {
+      value += (adjustments.value.highlights - 128) * ((value - 128) / 128)
+    }
+    if (value < 128) {
+      value += (adjustments.value.shadows - 128) * ((128 - value) / 128)
+    }
+
+    if (j === 0) rr = value
+    else if (j === 1) gg = value
+    else bb = value
+  }
+
+  // Apply color reduction for levels > 1
+  if (adjustments.value.colorReduce.enabled && adjustments.value.colorReduce.levels > 1) {
+    const step = 256 / (adjustments.value.colorReduce.levels - 1)
+    rr = Math.round(Math.round(rr / step) * step)
+    gg = Math.round(Math.round(gg / step) * step)
+    bb = Math.round(Math.round(bb / step) * step)
+  }
+
+  // Apply colorize last
+  if (adjustments.value.colorize.enabled) {
+    const tintColor = hexToRgb(adjustments.value.colorize.color)
+    const luminance = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255
+    const colorizeStrength = luminance < 0.02 ? 0 : 1
+    const intensity = (adjustments.value.colorize.intensity / 100) * colorizeStrength
+    const [r2, g2, b2] = blendColors([rr, gg, bb], tintColor, intensity * 100)
+    rr = r2
+    gg = g2
+    bb = b2
+  }
+
+  return [rr, gg, bb]
+}
+</script>
 <template>
   <div class="converter-container">
     <div class="main-content">
@@ -741,6 +783,93 @@ const handleNewFile = () => {
                   max="255"
                   class="adjustment-number"
                 >
+              </div>
+            </div>
+
+            <div class="adjustment-control">
+              <div class="adjustment-header">
+                <label>Colorize:</label>
+                <button
+                  class="reset-value-btn"
+                  @click="adjustments.colorize = { ...DEFAULT_SETTINGS.adjustments.colorize }"
+                  title="Reset colorize settings"
+                >
+                  Reset
+                </button>
+              </div>
+              <div class="colorize-controls">
+                <label class="toggle">
+                  <input
+                    type="checkbox"
+                    v-model="adjustments.colorize.enabled"
+                  >
+                  Enable colorize
+                </label>
+                <div class="color-picker-group" :class="{ disabled: !adjustments.colorize.enabled }">
+                  <input
+                    type="color"
+                    v-model="adjustments.colorize.color"
+                    :disabled="!adjustments.colorize.enabled"
+                  >
+                  <div class="adjustment-inputs">
+                    <input
+                      type="range"
+                      v-model="adjustments.colorize.intensity"
+                      min="0"
+                      max="100"
+                      step="1"
+                      :disabled="!adjustments.colorize.enabled"
+                    >
+                    <input
+                      type="number"
+                      v-model="adjustments.colorize.intensity"
+                      min="0"
+                      max="100"
+                      class="adjustment-number"
+                      :disabled="!adjustments.colorize.enabled"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="adjustment-control">
+              <div class="adjustment-header">
+                <label>Color Reduction:</label>
+                <button
+                  class="reset-value-btn"
+                  @click="adjustments.colorReduce = { ...DEFAULT_SETTINGS.adjustments.colorReduce }"
+                  title="Reset color reduction"
+                >
+                  Reset
+                </button>
+              </div>
+              <div class="color-reduce-controls">
+                <label class="toggle">
+                  <input
+                    type="checkbox"
+                    v-model="adjustments.colorReduce.enabled"
+                  >
+                  Enable color reduction
+                </label>
+                <div class="adjustment-inputs" :class="{ disabled: !adjustments.colorReduce.enabled }">
+                  <input
+                    type="range"
+                    v-model="adjustments.colorReduce.levels"
+                    min="1"
+                    max="6"
+                    step="1"
+                    :disabled="!adjustments.colorReduce.enabled"
+                  >
+                  <input
+                    type="number"
+                    v-model="adjustments.colorReduce.levels"
+                    min="1"
+                    max="6"
+                    class="adjustment-number"
+                    :disabled="!adjustments.colorReduce.enabled"
+                  >
+                </div>
               </div>
             </div>
           </div>
@@ -1560,5 +1689,57 @@ const handleNewFile = () => {
   color: #666;
   font-style: italic;
   border: 2px dashed #333;
+}
+
+.colorize-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #888;
+  cursor: pointer;
+}
+
+.color-picker-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.color-picker-group.disabled {
+  opacity: 0.5;
+}
+
+.color-picker-group input[type="color"] {
+  width: 100%;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+}
+
+.color-picker-group input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker-group input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.color-reduce-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.color-reduce-controls .adjustment-inputs.disabled {
+  opacity: 0.5;
 }
 </style>
