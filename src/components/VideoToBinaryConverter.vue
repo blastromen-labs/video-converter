@@ -135,7 +135,7 @@ const resizeVideo = (file) => {
       const canvas = document.createElement('canvas')
       canvas.width = targetResolution.value.width
       canvas.height = targetResolution.value.height
-      const ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
 
       const startTime = trimSettings.value.enabled ? trimSettings.value.start : 0
       const endTime = trimSettings.value.enabled ? trimSettings.value.end : video.duration
@@ -293,7 +293,7 @@ const hslToRgb = (h, s, l) => {
 const updatePreview = async () => {
   if (!videoPreview.value || !previewCanvas.value) return
 
-  const ctx = previewCanvas.value.getContext('2d')
+  const ctx = previewCanvas.value.getContext('2d', { willReadFrequently: true })
 
   // Fix parameter order
   const crop = cropToAspectRatio(
