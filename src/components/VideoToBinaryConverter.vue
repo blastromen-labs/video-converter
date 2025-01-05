@@ -97,6 +97,16 @@ const cropToAspectRatio = (sourceWidth, sourceHeight, targetWidth, targetHeight)
   const sourceRatio = sourceWidth / sourceHeight
   const targetRatio = targetWidth / targetHeight
 
+  // If aspect ratios are nearly identical (accounting for floating point precision)
+  if (Math.abs(sourceRatio - targetRatio) < 0.01) {
+    return {
+      sx: 0,
+      sy: 0,
+      sWidth: sourceWidth,
+      sHeight: sourceHeight
+    }
+  }
+
   let sx, sy, sWidth, sHeight
 
   if (sourceRatio > targetRatio) {
@@ -500,6 +510,11 @@ const resetTrimTimes = () => {
   trimSettings.value.start = 0
   trimSettings.value.end = videoMetadata.value?.duration || 0
 }
+
+// Add a new handler for the file input click
+const handleNewFile = () => {
+  fileInput.value?.click()
+}
 </script>
 
 <template>
@@ -818,45 +833,33 @@ const resetTrimTimes = () => {
         </div>
       </div>
 
-      <div
-        ref="dropZone"
-        class="drop-zone"
-        @drop="handleDrop"
-        @dragover="preventDefault"
-        @dragenter="preventDefault"
-      >
-        <div v-if="!isConverting && !convertedFile" class="drop-message">
-          <p>Drop your .mp4 or .mov file here</p>
-          <p>or</p>
-          <button class="select-btn" @click="fileInput.click()">
-            Select file from computer
-          </button>
-          <input
-            ref="fileInput"
-            type="file"
-            accept="video/mp4,video/quicktime"
-            class="hidden"
-            @change="handleFileSelect"
-          >
-        </div>
+      <div v-if="videoMetadata" class="metadata">
+        <h3>Video Information:</h3>
+        <p>Resolution: {{ videoMetadata.width }}x{{ videoMetadata.height }}</p>
+        <p>Aspect Ratio: {{ videoMetadata.aspectRatio }}</p>
+        <p>Duration: {{ videoMetadata.duration }}s</p>
+        <p>Original FPS: {{ videoMetadata.fps }}</p>
+    </div>
 
-        <div v-if="videoMetadata" class="metadata">
-          <h3>Video Information:</h3>
-          <p>Resolution: {{ videoMetadata.width }}x{{ videoMetadata.height }}</p>
-          <p>Aspect Ratio: {{ videoMetadata.aspectRatio }}</p>
-          <p>Duration: {{ videoMetadata.duration }}s</p>
-          <p>Original FPS: {{ videoMetadata.fps }}</p>
-        </div>
+    <div v-if="isConverting" class="converting">
+      Converting...
+      </div>
+    </div>
 
-        <div v-if="isConverting" class="converting">
-          Converting...
-        </div>
-
-        <div v-if="convertedFile" class="success">
-          <p>Conversion complete!</p>
-          <div class="button-group">
+    <div class="preview-section">
+      <div class="preview-header">
+        <h4>Video Preview</h4>
+        <div
+          class="preview-actions drop-zone"
+          ref="dropZone"
+          @drop="handleDrop"
+          @dragover="preventDefault"
+          @dragenter="preventDefault"
+        >
+          <span v-if="isConverting" class="converting-status">Converting...</span>
+          <div v-if="convertedFile && !isConverting" class="button-group">
             <a :href="convertedFile" :download="fileName" class="download-btn">
-              Download .bin file
+              Download .bin
             </a>
             <button
               v-if="settingsChanged"
@@ -864,22 +867,36 @@ const resetTrimTimes = () => {
               @click="reconvert"
               :disabled="isConverting"
             >
-              Reconvert with new settings
+              Reconvert
             </button>
             <button
               class="reset-btn"
-              @click="resetConverter"
+              @click="handleNewFile"
             >
-              Convert another file
+              New file
+            </button>
+          </div>
+          <div v-if="!previewUrl && !isConverting" class="button-group">
+            <button
+              class="reset-btn"
+              @click="handleNewFile"
+            >
+              Select video file
             </button>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="preview-section" v-if="previewUrl">
-      <h4>Video Preview</h4>
-      <div class="preview-row">
+      <!-- Add file input here, outside of the buttons but still in the preview section -->
+      <input
+        ref="fileInput"
+        type="file"
+        accept="video/mp4,video/quicktime"
+        class="hidden"
+        @change="handleFileSelect"
+      >
+
+      <div class="preview-row" v-if="previewUrl">
         <div class="preview-box">
           <h5>Original</h5>
           <video
@@ -889,6 +906,24 @@ const resetTrimTimes = () => {
             @loadeddata="updatePreview"
             @timeupdate="updatePreview"
           ></video>
+          <div v-if="videoMetadata" class="video-info">
+            <div class="info-row">
+              <span>Resolution:</span>
+              <span>{{ videoMetadata.width }}x{{ videoMetadata.height }}</span>
+            </div>
+            <div class="info-row">
+              <span>Aspect Ratio:</span>
+              <span>{{ videoMetadata.aspectRatio }}</span>
+            </div>
+            <div class="info-row">
+              <span>Duration:</span>
+              <span>{{ videoMetadata.duration }}s</span>
+            </div>
+            <div class="info-row">
+              <span>Original FPS:</span>
+              <span>{{ videoMetadata.fps }}</span>
+            </div>
+          </div>
         </div>
 
         <div class="preview-box">
@@ -901,37 +936,33 @@ const resetTrimTimes = () => {
           ></canvas>
         </div>
       </div>
+
+      <div v-else class="preview-placeholder">
+        <p>Drag & drop video file here or use the button above</p>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .drop-zone {
-  border: 2px dashed #888;
-  border-radius: 8px;
-  padding: 40px;
-  text-align: center;
-  margin: 20px 0;
-  min-height: 200px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
+  border: 2px dashed #333;
+  border-radius: 4px;
+  padding: 4px 8px;
+  transition: all 0.2s;
 }
 
-.drop-message {
-  color: #888;
-  font-size: 1.2em;
+.drop-zone:hover {
+  border-color: #42b883;
+  background: rgba(66, 184, 131, 0.1);
+}
+
+.drop-message, .select-btn {
+  display: none;
 }
 
 .converting {
-  color: #666;
-}
-
-.success {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: none;
 }
 
 .download-btn, .reset-btn {
@@ -965,46 +996,30 @@ const resetTrimTimes = () => {
   background-color: #42b883;
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
-  margin-top: 10px;
+  margin-top: 8px;
+  font-size: 0.9em;
 }
 
 .select-btn:hover {
   opacity: 0.9;
 }
 
-.drop-message p {
-  margin: 5px 0;
-}
-
 .metadata {
-  margin: 20px 0;
-  padding: 15px;
-  background-color: #f5f5f5;
-  border-radius: 4px;
-  text-align: left;
-}
-
-.metadata h3 {
-  margin: 0 0 10px 0;
-  color: #42b883;
-}
-
-.metadata p {
-  margin: 5px 0;
-  color: #666;
+  display: none;
 }
 
 .converter-container {
   display: grid;
-  grid-template-columns: 1fr 600px;
+  grid-template-columns: 1fr 800px;
   gap: 20px;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 20px;
+  align-items: start;
 }
 
 .main-content {
@@ -1052,7 +1067,7 @@ const resetTrimTimes = () => {
 .preview-box canvas {
   width: 100%;
   border-radius: 4px;
-  max-height: 400px;
+  max-height: 600px;
   object-fit: contain;
   background: #000;
 }
@@ -1060,13 +1075,18 @@ const resetTrimTimes = () => {
 .preview-canvas {
   image-rendering: pixelated;
   border: 1px solid #333;
-  height: 400px;
+  width: 100%;
+  height: auto !important;
+  aspect-ratio: 40/96;
 }
 
 .settings-panel {
   background-color: #1a1a1a;
   padding: 20px;
   border-radius: 8px;
+  height: calc(100% - 40px);
+  position: sticky;
+  top: 20px;
 }
 
 .settings-panel h3 {
@@ -1103,6 +1123,26 @@ const resetTrimTimes = () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.settings-group::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-group::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.settings-group::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+.settings-group::-webkit-scrollbar-thumb:hover {
+  background: #444;
 }
 
 .adjustment-controls {
@@ -1166,7 +1206,7 @@ const resetTrimTimes = () => {
 }
 
 /* Responsive design for smaller screens */
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
   .converter-container {
     grid-template-columns: 1fr;
   }
@@ -1244,8 +1284,8 @@ const resetTrimTimes = () => {
 
 .button-group {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 8px;
 }
 
 .reconvert-btn {
@@ -1365,5 +1405,160 @@ const resetTrimTimes = () => {
   background: #222;
   color: #444;
   cursor: not-allowed;
+}
+
+.video-info {
+  margin-top: 10px;
+  padding: 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
+  font-size: 0.8em;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  color: #888;
+  margin: 2px 0;
+}
+
+.info-row span:first-child {
+  color: #666;
+}
+
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.preview-actions .button-group {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-actions .button-group > * {
+  padding: 4px 12px;
+  font-size: 0.8em;
+  border-radius: 3px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.download-btn {
+  background-color: #42b883;
+  color: white;
+  text-decoration: none;
+  text-align: center;
+}
+
+.reconvert-btn {
+  background-color: #ff9800;
+  color: white;
+  border: none;
+}
+
+.reset-btn {
+  background-color: #333;
+  color: white;
+  border: none;
+}
+
+.download-btn:hover,
+.reconvert-btn:hover,
+.reset-btn:hover {
+  opacity: 0.9;
+}
+
+.reconvert-btn:disabled {
+  background-color: #666;
+  cursor: not-allowed;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  min-height: 32px;
+}
+
+.preview-header h4 {
+  margin: 0;
+  color: #42b883;
+}
+
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.preview-actions .button-group {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-actions .button-group > * {
+  padding: 4px 12px;
+  font-size: 0.8em;
+  border-radius: 3px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.converting-status {
+  color: #888;
+  font-size: 0.9em;
+  font-style: italic;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* Remove old preview-actions styles */
+.preview-section > .preview-actions {
+  display: none;
+}
+
+/* Update button styles to be more compact */
+.download-btn {
+  background-color: #42b883;
+  color: white;
+  text-decoration: none;
+}
+
+.reconvert-btn {
+  background-color: #ff9800;
+  color: white;
+  border: none;
+}
+
+.reset-btn {
+  background-color: #333;
+  color: white;
+  border: none;
+}
+
+.preview-box video {
+  width: 100%;
+  height: auto !important;
+  aspect-ratio: 40/96;
+  object-fit: contain;
+}
+
+/* Add placeholder styles */
+.preview-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  color: #666;
+  font-style: italic;
+  border: 2px dashed #333;
 }
 </style>
