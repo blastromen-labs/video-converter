@@ -6,6 +6,82 @@ import OutputSettings from './OutputSettings.vue'
 import ColorAnalyzer from './ColorAnalyzer.vue'
 import Navbar from './Navbar.vue'
 
+// Add default values as constants
+const DEFAULT_SETTINGS = {
+  resolution: {
+    width: 40,
+    height: 96,
+    fps: 30
+  },
+  adjustments: {
+    oneBit: {
+      enabled: false,
+      threshold: 128,
+      darkColor: '#000000',
+      lightColor: '#ffffff'
+    },
+    brightness: {
+      enabled: false,
+      value: 128
+    },
+    contrast: {
+      enabled: false,
+      value: 128
+    },
+    redLevel: {
+      enabled: false,
+      value: 128
+    },
+    greenLevel: {
+      enabled: false,
+      value: 128
+    },
+    blueLevel: {
+      enabled: false,
+      value: 128
+    },
+    highlights: {
+      enabled: false,
+      value: 128
+    },
+    shadows: {
+      enabled: false,
+      value: 128
+    },
+    midtones: {
+      enabled: false,
+      value: 128
+    },
+    hue: {
+      enabled: false,
+      value: 128
+    },
+    saturation: {
+      enabled: false,
+      value: 128
+    },
+    colorize: {
+      enabled: false,
+      color: '#42b883',
+      intensity: 50
+    },
+    colorReduce: {
+      enabled: false,
+      levels: 2
+    },
+    invert: {
+      enabled: false,
+      strength: 100
+    },
+    colorSwap: {
+      enabled: false,
+      sourceColor: '#0000ff',
+      targetColor: '#000000',
+      tolerance: 50
+    }
+  }
+}
+
 const dropZone = ref(null)
 const fileInput = ref(null)
 const isConverting = ref(false)
@@ -17,77 +93,13 @@ const previewCanvas = ref(null)
 const previewUrl = ref(null)
 
 // Add resolution settings
-const targetResolution = ref({
-  width: 40,
-  height: 96,
-  fps: 30
-})
+const targetResolution = ref({ ...DEFAULT_SETTINGS.resolution })
 
 // Add contrast threshold setting
 const contrastThreshold = ref(128)
 
-// Add new adjustment settings
-const adjustments = ref({
-  brightness: {
-    enabled: false,
-    value: 128
-  },
-  contrast: {
-    enabled: false,
-    value: 128
-  },
-  redLevel: {
-    enabled: false,
-    value: 128
-  },
-  greenLevel: {
-    enabled: false,
-    value: 128
-  },
-  blueLevel: {
-    enabled: false,
-    value: 128
-  },
-  highlights: {
-    enabled: false,
-    value: 128
-  },
-  shadows: {
-    enabled: false,
-    value: 128
-  },
-  midtones: {
-    enabled: false,
-    value: 128
-  },
-  hue: {
-    enabled: false,
-    value: 128
-  },
-  saturation: {
-    enabled: false,
-    value: 128
-  },
-  colorize: {
-    enabled: false,
-    color: '#42b883',
-    intensity: 50
-  },
-  colorReduce: {
-    enabled: false,
-    levels: 2
-  },
-  invert: {
-    enabled: false,
-    strength: 100
-  },
-  colorSwap: {
-    enabled: false,
-    sourceColor: '#0000ff',
-    targetColor: '#000000',
-    tolerance: 50
-  }
-})
+// Initialize adjustments with default values
+const adjustments = ref({ ...DEFAULT_SETTINGS.adjustments })
 
 // Add trim settings
 const trimSettings = ref({
@@ -96,7 +108,7 @@ const trimSettings = ref({
   end: 0
 })
 
-// Remove static FPS constants and use the ref value
+// Remove static FPS constant s and use the ref value
 const frameDelay = computed(() => 1000 / targetResolution.value.fps)
 
 const formatTime = (seconds) => {
@@ -542,92 +554,6 @@ watch(adjustments, () => {
   debouncedUpdate()
 }, { deep: true })
 
-// Add default values as constants
-const DEFAULT_SETTINGS = {
-  resolution: {
-    width: 40,
-    height: 96,
-    fps: 30
-  },
-  adjustments: {
-    brightness: {
-      enabled: false,
-      value: 128
-    },
-    contrast: {
-      enabled: false,
-      value: 128
-    },
-    redLevel: {
-      enabled: false,
-      value: 128
-    },
-    greenLevel: {
-      enabled: false,
-      value: 128
-    },
-    blueLevel: {
-      enabled: false,
-      value: 128
-    },
-    highlights: {
-      enabled: false,
-      value: 128
-    },
-    shadows: {
-      enabled: false,
-      value: 128
-    },
-    midtones: {
-      enabled: false,
-      value: 128
-    },
-    hue: {
-      enabled: false,
-      value: 128
-    },
-    saturation: {
-      enabled: false,
-      value: 128
-    },
-    colorize: {
-      enabled: false,
-      color: '#42b883',
-      intensity: 50
-    },
-    colorReduce: {
-      enabled: false,
-      levels: 2
-    },
-    invert: {
-      enabled: false,
-      strength: 100
-    },
-    colorSwap: {
-      enabled: false,
-      sourceColor: '#0000ff',
-      targetColor: '#000000',
-      tolerance: 50
-    }
-  },
-  trim: {
-    enabled: false,
-    start: 0,
-    end: 0
-  }
-}
-
-// Add reset settings function
-const resetSettings = () => {
-  targetResolution.value = { ...DEFAULT_SETTINGS.resolution }
-  adjustments.value = { ...DEFAULT_SETTINGS.adjustments }
-  trimSettings.value = {
-    ...DEFAULT_SETTINGS.trim,
-    end: videoMetadata.value?.duration || 0
-  }
-  settingsChanged.value = true
-}
-
 const incrementTime = (type, seconds) => {
   const value = trimSettings.value[type]
   const newValue = Math.max(0, value + seconds)
@@ -672,6 +598,21 @@ const hexToRgb = (hex) => {
 const processPixel = (r, g, b) => {
   let rr = r, gg = g, bb = b
   const adj = adjustments.value
+
+  // 1-Bit conversion (should be applied before other effects)
+  if (adj.oneBit.enabled) {
+    // Calculate luminance
+    const luminance = (rr * 0.299 + gg * 0.587 + bb * 0.114)
+    // Apply threshold
+    const isWhite = luminance > adj.oneBit.threshold
+    const targetColor = isWhite ? adj.oneBit.lightColor : adj.oneBit.darkColor
+    const [tr, tg, tb] = hexToRgb(targetColor)
+    rr = tr
+    gg = tg
+    bb = tb
+    // Return early since we don't need other color adjustments
+    return [rr, gg, bb]
+  }
 
   // 1. RGB level adjustments
   if (adj.redLevel.enabled) {

@@ -33,6 +33,7 @@ const sections = ref([
     {
         title: 'Effects',
         controls: [
+            { key: 'oneBit', label: '1-Bit', type: 'threshold' },
             { key: 'colorReduce', label: 'Color Reduction', type: 'levels' },
             { key: 'invert', label: 'Invert', type: 'strength' },
             { key: 'colorize', label: 'Colorize', type: 'color' },
@@ -150,6 +151,29 @@ const resetValue = (control) => {
                                         class="w-12 text-right bg-control-bg border border-border rounded px-1 py-0.5 text-sm text-text-secondary">
                                     <span class="text-text-secondary text-sm">%</span>
                                 </div>
+                                <button @click="resetValue(control)"
+                                    class="w-6 h-6 flex items-center justify-center text-text-secondary hover:text-text transition-colors"
+                                    :disabled="!adjustments[control.key].enabled" title="Reset to default">
+                                    <span class="text-lg">↺</span>
+                                </button>
+                            </div>
+                        </template>
+
+                        <!-- Threshold controls -->
+                        <template v-else-if="control.type === 'threshold'">
+                            <div class="flex items-center gap-2 flex-1">
+                                <input type="color" v-model="adjustments[control.key].darkColor"
+                                    :disabled="!adjustments[control.key].enabled" class="color-picker"
+                                    title="Dark color">
+                                <input type="color" v-model="adjustments[control.key].lightColor"
+                                    :disabled="!adjustments[control.key].enabled" class="color-picker"
+                                    title="Light color">
+                                <input type="range" v-model.number="adjustments[control.key].threshold"
+                                    :disabled="!adjustments[control.key].enabled" min="0" max="255"
+                                    class="w-24 accent-accent">
+                                <input type="number" v-model.number="adjustments[control.key].threshold"
+                                    :disabled="!adjustments[control.key].enabled" min="0" max="255"
+                                    class="w-12 text-right bg-control-bg border border-border rounded px-1 py-0.5 text-sm text-text-secondary">
                                 <button @click="resetValue(control)"
                                     class="w-6 h-6 flex items-center justify-center text-text-secondary hover:text-text transition-colors"
                                     :disabled="!adjustments[control.key].enabled" title="Reset to default">

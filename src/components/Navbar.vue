@@ -38,6 +38,12 @@ const randomizeSettings = () => {
 
     const newAdjustments = {
         ...props.adjustments,
+        oneBit: {
+            enabled: randomBool(),
+            threshold: randomInt(0, 255),
+            darkColor: randomHex(),
+            lightColor: randomHex()
+        },
         brightness: {
             enabled: randomBool(),
             value: randomInt(0, 255)
