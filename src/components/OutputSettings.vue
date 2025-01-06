@@ -123,7 +123,24 @@ const randomizeSettings = () => {
             <div class="adjustment-controls">
                 <div class="adjustment-control">
                     <div class="adjustment-row">
-                        <label for="contrast" class="adjustment-label">Contrast:</label>
+                        <label class="adjustment-label">Brightness:</label>
+                        <div class="adjustment-inputs">
+                            <input type="range" v-model="adjustments.brightness" min="0" max="255"
+                                @input="emit('update:adjustments', { ...adjustments })">
+                            <input type="number" v-model="adjustments.brightness" min="0" max="255"
+                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
+                        </div>
+                        <button class="reset-icon-btn"
+                            @click="emit('update:adjustments', { ...adjustments, brightness: defaultSettings.adjustments.brightness })"
+                            title="Reset brightness">
+                            ↺
+                        </button>
+                    </div>
+                </div>
+
+                <div class="adjustment-control">
+                    <div class="adjustment-row">
+                        <label class="adjustment-label">Contrast:</label>
                         <div class="adjustment-inputs">
                             <input id="contrast-slider" type="range" v-model="adjustments.contrast" min="0" max="255"
                                 step="1" @input="emit('update:adjustments', { ...adjustments })">
@@ -183,23 +200,6 @@ const randomizeSettings = () => {
                         </div>
                         <button class="reset-icon-btn"
                             @click="emit('update:adjustments', { ...adjustments, shadows: defaultSettings.adjustments.shadows })"
-                            title="Reset to default value">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label for="brightness" class="adjustment-label">Brightness:</label>
-                        <div class="adjustment-inputs">
-                            <input id="brightness-slider" type="range" v-model="adjustments.brightness" min="0"
-                                max="255" step="1" @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.brightness" min="0" max="255"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, brightness: defaultSettings.adjustments.brightness })"
                             title="Reset to default value">
                             ↺
                         </button>
