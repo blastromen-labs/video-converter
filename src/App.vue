@@ -3,5 +3,7 @@ import VideoToBinaryConverter from './components/VideoToBinaryConverter.vue'
 </script>
 
 <template>
-  <VideoToBinaryConverter />
+  <div class="min-h-screen bg-red-500">
+    <VideoToBinaryConverter />
+  </div>
 </template>
