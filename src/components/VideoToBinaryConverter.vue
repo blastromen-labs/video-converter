@@ -1,5 +1,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
+import VideoPreview from './VideoPreview.vue'
+import TrimVideo from './TrimVideo.vue'
+import OutputSettings from './OutputSettings.vue'
 
 const dropZone = ref(null)
 const fileInput = ref(null)
@@ -26,6 +29,7 @@ const adjustments = ref({
   contrast: 128,
   highlights: 128,
   shadows: 128,
+  midtones: 128,
   brightness: 128,
   hue: 128,
   saturation: 128,
@@ -92,13 +96,13 @@ const getVideoMetadata = (file) => {
         width,
         height,
         aspectRatio: simplifiedRatio,
-        duration: video.duration.toFixed(2),
+        duration: Number(video.duration),
         fps
       }
       URL.revokeObjectURL(video.src)
 
       // Set initial end time when video is loaded
-      trimSettings.value.end = video.duration
+      trimSettings.value.end = metadata.duration
 
       resolve(metadata)
     }
@@ -421,6 +425,7 @@ const DEFAULT_SETTINGS = {
     contrast: 128,
     highlights: 128,
     shadows: 128,
+    midtones: 128,
     brightness: 128,
     hue: 128,
     saturation: 128,
@@ -532,12 +537,15 @@ const processPixel = (r, g, b) => {
     value += (adjustments.value.brightness - 128)
     value = ((value - 128) * (adjustments.value.contrast / 128)) + 128
 
+    // Add midtones adjustment between highlights and shadows
     if (value > 128) {
       value += (adjustments.value.highlights - 128) * ((value - 128) / 128)
-    }
-    if (value < 128) {
+    } else if (value < 128) {
       value += (adjustments.value.shadows - 128) * ((128 - value) / 128)
     }
+    // Apply midtones adjustment with less effect near extremes
+    const midtoneFactor = 1 - Math.abs(value - 128) / 128
+    value += (adjustments.value.midtones - 128) * midtoneFactor
 
     if (j === 0) rr = value
     else if (j === 1) gg = value
@@ -574,246 +582,32 @@ const processPixel = (r, g, b) => {
 
   return [rr, gg, bb]
 }
+
+const processVideoFrame = (imageData) => {
+  const data = imageData.data
+  for (let i = 0; i < data.length; i += 4) {
+    const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
+    data[i] = r
+    data[i + 1] = g
+    data[i + 2] = b
+    data[i + 3] = 255
+  }
+}
+
+const handleVideoLoaded = (video) => {
+  // Handle any initialization needed when video loads
+}
+
+const handleTrimReset = () => {
+  trimSettings.value.start = 0
+  trimSettings.value.end = videoMetadata.value?.duration || 0
+}
 </script>
 <template>
   <div class="converter-container">
     <div class="main-content">
-      <div class="settings-panel">
-        <div class="settings-header">
-          <h3>Output Settings</h3>
-          <button class="reset-settings-btn" @click="resetSettings" title="Reset all settings to default values">
-            Reset Settings
-          </button>
-        </div>
-        <div class="settings-group">
-          <div class="resolution-inputs">
-            <div class="input-group">
-              <label for="width">Width:</label>
-              <input id="width" type="number" v-model="targetResolution.width" min="1">
-            </div>
-            <div class="input-group">
-              <label for="height">Height:</label>
-              <input id="height" type="number" v-model="targetResolution.height" min="1">
-            </div>
-            <div class="input-group">
-              <label for="fps">FPS:</label>
-              <input id="fps" type="number" v-model="targetResolution.fps" min="1" max="60">
-            </div>
-          </div>
-
-          <div class="adjustment-controls">
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label for="contrast">Contrast:</label>
-                <button class="reset-value-btn" @click="adjustments.contrast = DEFAULT_SETTINGS.adjustments.contrast"
-                  title="Reset to default value">
-                  Reset
-                </button>
-              </div>
-              <div class="adjustment-inputs">
-                <input id="contrast-slider" type="range" v-model="adjustments.contrast" min="0" max="255" step="1">
-                <input type="number" v-model="adjustments.contrast" min="0" max="255" class="adjustment-number">
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label for="highlights">Highlights:</label>
-                <button class="reset-value-btn"
-                  @click="adjustments.highlights = DEFAULT_SETTINGS.adjustments.highlights"
-                  title="Reset to default value">
-                  Reset
-                </button>
-              </div>
-              <div class="adjustment-inputs">
-                <input id="highlights-slider" type="range" v-model="adjustments.highlights" min="0" max="255" step="1">
-                <input type="number" v-model="adjustments.highlights" min="0" max="255" class="adjustment-number">
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label for="shadows">Shadows:</label>
-                <button class="reset-value-btn" @click="adjustments.shadows = DEFAULT_SETTINGS.adjustments.shadows"
-                  title="Reset to default value">
-                  Reset
-                </button>
-              </div>
-              <div class="adjustment-inputs">
-                <input id="shadows-slider" type="range" v-model="adjustments.shadows" min="0" max="255" step="1">
-                <input type="number" v-model="adjustments.shadows" min="0" max="255" class="adjustment-number">
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label for="brightness">Brightness:</label>
-                <button class="reset-value-btn"
-                  @click="adjustments.brightness = DEFAULT_SETTINGS.adjustments.brightness"
-                  title="Reset to default value">
-                  Reset
-                </button>
-              </div>
-              <div class="adjustment-inputs">
-                <input id="brightness-slider" type="range" v-model="adjustments.brightness" min="0" max="255" step="1">
-                <input type="number" v-model="adjustments.brightness" min="0" max="255" class="adjustment-number">
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label for="hue">Hue:</label>
-                <button class="reset-value-btn" @click="adjustments.hue = DEFAULT_SETTINGS.adjustments.hue"
-                  title="Reset to default value">
-                  Reset
-                </button>
-              </div>
-              <div class="adjustment-inputs">
-                <input id="hue-slider" type="range" v-model="adjustments.hue" min="0" max="255" step="1">
-                <input type="number" v-model="adjustments.hue" min="0" max="255" class="adjustment-number">
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label for="saturation">Saturation:</label>
-                <button class="reset-value-btn"
-                  @click="adjustments.saturation = DEFAULT_SETTINGS.adjustments.saturation"
-                  title="Reset to default value">
-                  Reset
-                </button>
-              </div>
-              <div class="adjustment-inputs">
-                <input id="saturation-slider" type="range" v-model="adjustments.saturation" min="0" max="255" step="1">
-                <input type="number" v-model="adjustments.saturation" min="0" max="255" class="adjustment-number">
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label>Colorize:</label>
-                <button class="reset-value-btn"
-                  @click="adjustments.colorize = { ...DEFAULT_SETTINGS.adjustments.colorize }"
-                  title="Reset colorize settings">
-                  Reset
-                </button>
-              </div>
-              <div class="colorize-controls">
-                <label class="toggle">
-                  <input type="checkbox" v-model="adjustments.colorize.enabled">
-                  Enable colorize
-                </label>
-                <div class="color-picker-group" :class="{ disabled: !adjustments.colorize.enabled }">
-                  <input type="color" v-model="adjustments.colorize.color" :disabled="!adjustments.colorize.enabled">
-                  <div class="adjustment-inputs">
-                    <input type="range" v-model="adjustments.colorize.intensity" min="0" max="100" step="1"
-                      :disabled="!adjustments.colorize.enabled">
-                    <input type="number" v-model="adjustments.colorize.intensity" min="0" max="100"
-                      class="adjustment-number" :disabled="!adjustments.colorize.enabled">
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label>Color Reduction:</label>
-                <button class="reset-value-btn"
-                  @click="adjustments.colorReduce = { ...DEFAULT_SETTINGS.adjustments.colorReduce }"
-                  title="Reset color reduction">
-                  Reset
-                </button>
-              </div>
-              <div class="color-reduce-controls">
-                <label class="toggle">
-                  <input type="checkbox" v-model="adjustments.colorReduce.enabled">
-                  Enable color reduction
-                </label>
-                <div class="adjustment-inputs" :class="{ disabled: !adjustments.colorReduce.enabled }">
-                  <input type="range" v-model="adjustments.colorReduce.levels" min="1" max="6" step="1"
-                    :disabled="!adjustments.colorReduce.enabled">
-                  <input type="number" v-model="adjustments.colorReduce.levels" min="1" max="6"
-                    class="adjustment-number" :disabled="!adjustments.colorReduce.enabled">
-                </div>
-              </div>
-            </div>
-
-            <div class="adjustment-control">
-              <div class="adjustment-header">
-                <label>Invert:</label>
-                <button class="reset-value-btn" @click="adjustments.invert = { ...DEFAULT_SETTINGS.adjustments.invert }"
-                  title="Reset invert">
-                  Reset
-                </button>
-              </div>
-              <div class="invert-controls">
-                <label class="toggle">
-                  <input type="checkbox" v-model="adjustments.invert.enabled">
-                  Enable invert
-                </label>
-                <div class="adjustment-inputs" :class="{ disabled: !adjustments.invert.enabled }">
-                  <input type="range" v-model="adjustments.invert.strength" min="0" max="100" step="1"
-                    :disabled="!adjustments.invert.enabled">
-                  <input type="number" v-model="adjustments.invert.strength" min="0" max="100" class="adjustment-number"
-                    :disabled="!adjustments.invert.enabled">
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="trim-controls">
-            <div class="trim-header">
-              <h4>Trim Video</h4>
-              <div class="trim-header-controls">
-                <button class="reset-value-btn" @click="resetTrimTimes" title="Reset trim times">
-                  Reset
-                </button>
-                <label class="trim-toggle">
-                  <input type="checkbox" v-model="trimSettings.enabled">
-                  Enable trim
-                </label>
-              </div>
-            </div>
-
-            <div class="trim-inputs" :class="{ disabled: !trimSettings.enabled }">
-              <div class="trim-input">
-                <label for="trim-start">Start Time:</label>
-                <div class="time-input-group">
-                  <input id="trim-start" type="text" :value="formatTime(trimSettings.start)"
-                    @change="e => trimSettings.start = parseTime(e.target.value)" :disabled="!trimSettings.enabled"
-                    pattern="[0-9]+:[0-5][0-9].[0-9]{3}" placeholder="0:00.000">
-                  <div class="time-controls">
-                    <button @click="incrementTime('start', 1)" :disabled="!trimSettings.enabled" title="Add 1 second">
-                      ▲
-                    </button>
-                    <button @click="incrementTime('start', -1)" :disabled="!trimSettings.enabled"
-                      title="Subtract 1 second">
-                      ▼
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="trim-input">
-                <label for="trim-end">End Time:</label>
-                <div class="time-input-group">
-                  <input id="trim-end" type="text" :value="formatTime(trimSettings.end)"
-                    @change="e => trimSettings.end = parseTime(e.target.value)" :disabled="!trimSettings.enabled"
-                    pattern="[0-9]+:[0-5][0-9].[0-9]{3}" placeholder="0:00.000">
-                  <div class="time-controls">
-                    <button @click="incrementTime('end', 1)" :disabled="!trimSettings.enabled" title="Add 1 second">
-                      ▲
-                    </button>
-                    <button @click="incrementTime('end', -1)" :disabled="!trimSettings.enabled"
-                      title="Subtract 1 second">
-                      ▼
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <OutputSettings v-model:target-resolution="targetResolution" v-model:adjustments="adjustments"
+        v-model:trim-settings="trimSettings" :default-settings="DEFAULT_SETTINGS" :video-metadata="videoMetadata" />
 
       <div v-if="videoMetadata" class="metadata">
         <h3>Video Information:</h3>
@@ -821,10 +615,6 @@ const processPixel = (r, g, b) => {
         <p>Aspect Ratio: {{ videoMetadata.aspectRatio }}</p>
         <p>Duration: {{ videoMetadata.duration }}s</p>
         <p>Original FPS: {{ videoMetadata.fps }}</p>
-      </div>
-
-      <div v-if="isConverting" class="converting">
-        Converting...
       </div>
     </div>
 
@@ -854,37 +644,9 @@ const processPixel = (r, g, b) => {
 
       <input ref="fileInput" type="file" accept="video/mp4,video/quicktime" class="hidden" @change="handleFileSelect">
 
-      <div class="preview-row" v-if="previewUrl">
-        <div class="preview-box">
-          <h5>Original</h5>
-          <video ref="videoPreview" :src="previewUrl" controls @loadeddata="updatePreview"
-            @timeupdate="updatePreview"></video>
-          <div v-if="videoMetadata" class="video-info">
-            <div class="info-row">
-              <span>Resolution:</span>
-              <span>{{ videoMetadata.width }}x{{ videoMetadata.height }}</span>
-            </div>
-            <div class="info-row">
-              <span>Aspect Ratio:</span>
-              <span>{{ videoMetadata.aspectRatio }}</span>
-            </div>
-            <div class="info-row">
-              <span>Duration:</span>
-              <span>{{ videoMetadata.duration }}s</span>
-            </div>
-            <div class="info-row">
-              <span>Original FPS:</span>
-              <span>{{ videoMetadata.fps }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="preview-box">
-          <h5>Conversion</h5>
-          <canvas ref="previewCanvas" :width="targetResolution.width" :height="targetResolution.height"
-            class="preview-canvas"></canvas>
-        </div>
-      </div>
+      <VideoPreview v-if="previewUrl" :video-url="previewUrl" :metadata="videoMetadata"
+        :preview-width="targetResolution.width" :preview-height="targetResolution.height"
+        :process-frame="processVideoFrame" @video-loaded="handleVideoLoaded" />
 
       <div v-else class="preview-placeholder">
         <p>Drag & drop video file here or use the button above</p>
