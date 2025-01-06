@@ -91,27 +91,34 @@ const randomizeSettings = () => {
         <PresetManager :current-settings="getCurrentSettings()" @load-preset="handleLoadPreset" />
 
         <div class="settings-group">
-            <div class="resolution-inputs">
-                <div class="input-group">
-                    <label for="width">Width:</label>
-                    <input id="width" type="number" v-model="targetResolution.width" min="1"
-                        @input="emit('update:targetResolution', { ...targetResolution })">
+            <div class="resolution-settings">
+                <div class="resolution-inputs">
+                    <div class="input-group">
+                        <label for="width">Width:</label>
+                        <input id="width" type="number" v-model="targetResolution.width" min="1"
+                            @input="emit('update:targetResolution', { ...targetResolution })">
+                    </div>
+                    <div class="input-group">
+                        <label for="height">Height:</label>
+                        <input id="height" type="number" v-model="targetResolution.height" min="1"
+                            @input="emit('update:targetResolution', { ...targetResolution })">
+                    </div>
+                    <div class="input-group">
+                        <label for="fps">FPS:</label>
+                        <input id="fps" type="number" v-model="targetResolution.fps" min="1" max="60"
+                            @input="emit('update:targetResolution', { ...targetResolution })">
+                    </div>
+                    <div class="input-group trim-toggle">
+                        <label for="trim-enabled">Trim:</label>
+                        <input id="trim-enabled" type="checkbox" v-model="trimSettings.enabled"
+                            @input="emit('update:trimSettings', { ...trimSettings })">
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label for="height">Height:</label>
-                    <input id="height" type="number" v-model="targetResolution.height" min="1"
-                        @input="emit('update:targetResolution', { ...targetResolution })">
-                </div>
-                <div class="input-group">
-                    <label for="fps">FPS:</label>
-                    <input id="fps" type="number" v-model="targetResolution.fps" min="1" max="60"
-                        @input="emit('update:targetResolution', { ...targetResolution })">
-                </div>
-            </div>
 
-            <TrimVideo v-if="videoMetadata" v-model:enabled="trimSettings.enabled"
-                v-model:startTime="trimSettings.start" v-model:endTime="trimSettings.end"
-                :duration="videoMetadata?.duration || 0" :onReset="handleTrimReset" />
+                <TrimVideo v-if="videoMetadata && trimSettings.enabled" v-model:enabled="trimSettings.enabled"
+                    v-model:startTime="trimSettings.start" v-model:endTime="trimSettings.end"
+                    :duration="videoMetadata?.duration || 0" :onReset="handleTrimReset" />
+            </div>
 
             <div class="adjustment-controls">
                 <div class="adjustment-control">
@@ -517,5 +524,26 @@ input[type="color"] {
 .adjustment-inputs.disabled {
     opacity: 0.5;
     pointer-events: none;
+}
+
+.resolution-settings {
+    margin-bottom: 10px;
+}
+
+.resolution-inputs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.trim-toggle {
+    margin-left: auto;
+}
+
+.trim-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
 }
 </style>

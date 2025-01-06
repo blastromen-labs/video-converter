@@ -646,7 +646,7 @@ const handleTrimReset = () => {
 
       <VideoPreview v-if="previewUrl" :video-url="previewUrl" :metadata="videoMetadata"
         :preview-width="targetResolution.width" :preview-height="targetResolution.height"
-        :process-frame="processVideoFrame" @video-loaded="handleVideoLoaded" />
+        :process-frame="processVideoFrame" :trim-settings="trimSettings" @video-loaded="handleVideoLoaded" />
 
       <div v-else class="preview-placeholder">
         <p>Drag & drop video file here or use the button above</p>

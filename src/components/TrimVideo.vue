@@ -35,57 +35,115 @@ const incrementTime = (type, seconds) => {
         emit('update:endTime', Math.min(newValue, props.duration))
     }
 }
+
+const updateStartTime = (e) => {
+    emit('update:startTime', Math.min(parseTime(e.target.value), props.endTime))
+}
+
+const updateEndTime = (e) => {
+    emit('update:endTime', Math.min(parseTime(e.target.value), props.duration))
+}
 </script>
 
 <template>
     <div class="trim-controls">
-        <div class="trim-header">
-            <h4>Trim Video</h4>
-            <div class="trim-header-controls">
-                <button class="reset-value-btn" @click="onReset" title="Reset trim times">
-                    Reset
-                </button>
-                <label class="trim-toggle">
-                    <input type="checkbox" :checked="enabled" @input="emit('update:enabled', $event.target.checked)">
-                    Enable trim
-                </label>
-            </div>
-        </div>
-
-        <div class="trim-inputs" :class="{ disabled: !enabled }">
-            <div class="trim-input">
-                <label for="trim-start">Start Time:</label>
-                <div class="time-input-group">
-                    <input id="trim-start" type="text" :value="formatTime(startTime)"
-                        @change="e => emit('update:startTime', parseTime(e.target.value))" :disabled="!enabled"
-                        pattern="[0-9]+:[0-5][0-9].[0-9]{3}" placeholder="0:00.000">
-                    <div class="time-controls">
-                        <button @click="incrementTime('start', 1)" :disabled="!enabled" title="Add 1 second">
-                            ▲
-                        </button>
-                        <button @click="incrementTime('start', -1)" :disabled="!enabled" title="Subtract 1 second">
-                            ▼
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="trim-input">
-                <label for="trim-end">End Time:</label>
-                <div class="time-input-group">
-                    <input id="trim-end" type="text" :value="formatTime(endTime)"
-                        @change="e => emit('update:endTime', parseTime(e.target.value))" :disabled="!enabled"
-                        pattern="[0-9]+:[0-5][0-9].[0-9]{3}" placeholder="0:00.000">
-                    <div class="time-controls">
-                        <button @click="incrementTime('end', 1)" :disabled="!enabled" title="Add 1 second">
-                            ▲
-                        </button>
-                        <button @click="incrementTime('end', -1)" :disabled="!enabled" title="Subtract 1 second">
-                            ▼
-                        </button>
-                    </div>
+        <div class="trim-row">
+            <label>Start Time:</label>
+            <div class="time-inputs">
+                <input type="text" :value="formatTime(startTime)" @change="updateStartTime" class="time-input">
+                <div class="time-buttons">
+                    <button @click="incrementTime('start', -1)">-1s</button>
+                    <button @click="incrementTime('start', 1)">+1s</button>
                 </div>
             </div>
         </div>
+
+        <div class="trim-row">
+            <label>End Time:</label>
+            <div class="time-inputs">
+                <input type="text" :value="formatTime(endTime)" @change="updateEndTime" class="time-input">
+                <div class="time-buttons">
+                    <button @click="incrementTime('end', -1)">-1s</button>
+                    <button @click="incrementTime('end', 1)">+1s</button>
+                </div>
+            </div>
+        </div>
+
+        <button class="reset-icon-btn" @click="onReset" title="Reset trim times">
+            ↺
+        </button>
     </div>
 </template>
+
+<style>
+/* Update styles */
+.trim-controls {
+    background: #2a2a2a;
+    padding: 8px;
+    border-radius: 4px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.trim-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.time-inputs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.time-input {
+    width: 80px;
+    padding: 2px 4px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: white;
+    border-radius: 4px;
+}
+
+.time-buttons {
+    display: flex;
+    gap: 2px;
+}
+
+.time-buttons button {
+    padding: 2px 4px;
+    background: #333;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+.time-buttons button:hover {
+    background: #444;
+}
+
+.reset-icon-btn {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 1.2em;
+    padding: 2px;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    margin-left: auto;
+}
+
+.reset-icon-btn:hover {
+    background: #333;
+    color: #fff;
+}
+</style>
