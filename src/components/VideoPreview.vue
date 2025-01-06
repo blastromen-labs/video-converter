@@ -21,7 +21,7 @@ const updatePreview = async () => {
     const ctx = canvasRef.value.getContext('2d', { willReadFrequently: true })
     const video = videoRef.value
 
-    // Calculate crop dimensions to maintain aspect ratio
+    // Calculate source and target ratios for cropping
     const sourceRatio = video.videoWidth / video.videoHeight
     const targetRatio = props.previewWidth / props.previewHeight
 
@@ -107,7 +107,7 @@ onUnmounted(() => {
                 </div>
                 <div class="info-row">
                     <span>Aspect Ratio:</span>
-                    <span>{{ metadata.aspectRatio }}</span>
+                    <span>{{ metadata.sourceAspectRatio }}</span>
                 </div>
                 <div class="info-row">
                     <span>Duration:</span>
@@ -136,7 +136,7 @@ onUnmounted(() => {
                 </div>
                 <div class="info-row">
                     <span>Aspect Ratio:</span>
-                    <span>{{ metadata.aspectRatio }}</span>
+                    <span>{{ metadata.targetAspectRatio }}</span>
                 </div>
                 <div class="info-row">
                     <span>Duration:</span>

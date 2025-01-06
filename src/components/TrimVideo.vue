@@ -46,104 +46,53 @@ const updateEndTime = (e) => {
 </script>
 
 <template>
-    <div class="trim-controls">
-        <div class="trim-row">
-            <label>Start Time:</label>
-            <div class="time-inputs">
-                <input type="text" :value="formatTime(startTime)" @change="updateStartTime" class="time-input">
-                <div class="time-buttons">
-                    <button @click="incrementTime('start', -1)">-1s</button>
-                    <button @click="incrementTime('start', 1)">+1s</button>
-                </div>
+    <div class="adjustment-control">
+        <div class="adjustment-row">
+            <input type="checkbox" :checked="enabled" @input="$emit('update:enabled', $event.target.checked)"
+                class="enable-checkbox">
+            <label class="adjustment-label">Start:</label>
+            <div class="adjustment-inputs" :class="{ disabled: !enabled }">
+                <input type="text" :value="formatTime(startTime)" @input="updateStartTime" :disabled="!enabled">
+                <button class="time-btn" @click="() => incrementTime('start', -1)" :disabled="!enabled">-1s</button>
+                <button class="time-btn" @click="() => incrementTime('start', 1)" :disabled="!enabled">+1s</button>
             </div>
+            <button class="reset-icon-btn" @click="onReset" title="Reset trim">↺</button>
         </div>
 
-        <div class="trim-row">
-            <label>End Time:</label>
-            <div class="time-inputs">
-                <input type="text" :value="formatTime(endTime)" @change="updateEndTime" class="time-input">
-                <div class="time-buttons">
-                    <button @click="incrementTime('end', -1)">-1s</button>
-                    <button @click="incrementTime('end', 1)">+1s</button>
-                </div>
+        <div class="adjustment-row">
+            <div class="enable-checkbox-spacer"></div>
+            <label class="adjustment-label">End:</label>
+            <div class="adjustment-inputs" :class="{ disabled: !enabled }">
+                <input type="text" :value="formatTime(endTime)" @input="updateEndTime" :disabled="!enabled">
+                <button class="time-btn" @click="() => incrementTime('end', -1)" :disabled="!enabled">-1s</button>
+                <button class="time-btn" @click="() => incrementTime('end', 1)" :disabled="!enabled">+1s</button>
             </div>
         </div>
-
-        <button class="reset-icon-btn" @click="onReset" title="Reset trim times">
-            ↺
-        </button>
     </div>
 </template>
 
 <style>
-/* Update styles */
-.trim-controls {
-    background: #2a2a2a;
-    padding: 8px;
-    border-radius: 4px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
+.enable-checkbox-spacer {
+    width: 16px;
+    margin-right: 8px;
 }
 
-.trim-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.time-inputs {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.time-input {
-    width: 80px;
-    padding: 2px 4px;
-    background: #1a1a1a;
-    border: 1px solid #333;
-    color: white;
-    border-radius: 4px;
-}
-
-.time-buttons {
-    display: flex;
-    gap: 2px;
-}
-
-.time-buttons button {
-    padding: 2px 4px;
+.time-btn {
+    padding: 2px 6px;
     background: #333;
     border: none;
-    color: white;
-    border-radius: 4px;
+    color: #fff;
+    border-radius: 3px;
     cursor: pointer;
     font-size: 0.8em;
 }
 
-.time-buttons button:hover {
+.time-btn:hover:not(:disabled) {
     background: #444;
 }
 
-.reset-icon-btn {
-    background: none;
-    border: none;
-    color: #666;
-    font-size: 1.2em;
-    padding: 2px;
-    cursor: pointer;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    margin-left: auto;
-}
-
-.reset-icon-btn:hover {
-    background: #333;
-    color: #fff;
+.time-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 </style>

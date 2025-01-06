@@ -26,21 +26,42 @@ const contrastThreshold = ref(128)
 
 // Add new adjustment settings
 const adjustments = ref({
-  contrast: 128,
-  highlights: 128,
-  shadows: 128,
-  midtones: 128,
-  brightness: 128,
-  hue: 128,
-  saturation: 128,
+  brightness: {
+    enabled: false,
+    value: 128
+  },
+  contrast: {
+    enabled: false,
+    value: 128
+  },
+  highlights: {
+    enabled: false,
+    value: 128
+  },
+  shadows: {
+    enabled: false,
+    value: 128
+  },
+  midtones: {
+    enabled: false,
+    value: 128
+  },
+  hue: {
+    enabled: false,
+    value: 128
+  },
+  saturation: {
+    enabled: false,
+    value: 128
+  },
   colorize: {
     enabled: false,
-    color: '#42b883', // Default color (the Vue green)
-    intensity: 50     // 0-100 scale
+    color: '#42b883',
+    intensity: 50
   },
   colorReduce: {
     enabled: false,
-    levels: 2, // 2 for black/white, can go up to 256 for full color
+    levels: 2
   },
   invert: {
     enabled: false,
@@ -50,9 +71,9 @@ const adjustments = ref({
 
 // Add trim settings
 const trimSettings = ref({
+  enabled: false,
   start: 0,
-  end: 0,
-  enabled: false
+  end: 0
 })
 
 // Remove static FPS constants and use the ref value
@@ -79,31 +100,29 @@ const getVideoMetadata = (file) => {
       const width = video.videoWidth
       const height = video.videoHeight
 
-      // Calculate simplified ratio
+      // Calculate original video aspect ratio
       const gcd = (a, b) => b ? gcd(b, a % b) : a
-      const divisor = gcd(width, height)
-      const simplifiedRatio = `${width / divisor}:${height / divisor}`
+      const sourceDiv = gcd(width, height)
+      const sourceRatio = `${width / sourceDiv}:${height / sourceDiv}`
 
-      // Get framerate if available
-      let fps = 30; // default fallback
-      if (video.webkitDecodedFrameCount) {
-        fps = Math.round(video.webkitDecodedFrameCount / video.duration)
-      } else if (video.mozDecodedFrames) {
-        fps = Math.round(video.mozDecodedFrames / video.duration)
-      }
+      // Calculate target aspect ratio
+      const targetWidth = targetResolution.value.width
+      const targetHeight = targetResolution.value.height
+      const targetDiv = gcd(targetWidth, targetHeight)
+      const targetRatio = `${targetWidth / targetDiv}:${targetHeight / targetDiv}`
 
       const metadata = {
         width,
         height,
-        aspectRatio: simplifiedRatio,
+        sourceAspectRatio: sourceRatio,
+        targetAspectRatio: targetRatio,
         duration: Number(video.duration),
-        fps
+        fps: video.webkitDecodedFrameCount ?
+          Math.round(video.webkitDecodedFrameCount / video.duration) : 30
       }
       URL.revokeObjectURL(video.src)
 
-      // Set initial end time when video is loaded
       trimSettings.value.end = metadata.duration
-
       resolve(metadata)
     }
     video.src = URL.createObjectURL(file)
@@ -111,36 +130,34 @@ const getVideoMetadata = (file) => {
 }
 
 const cropToAspectRatio = (sourceWidth, sourceHeight, targetWidth, targetHeight) => {
-  const sourceRatio = sourceWidth / sourceHeight
+  // Calculate target aspect ratio from output dimensions
   const targetRatio = targetWidth / targetHeight
 
-  // If aspect ratios are nearly identical (accounting for floating point precision)
-  if (Math.abs(sourceRatio - targetRatio) < 0.01) {
-    return {
-      sx: 0,
-      sy: 0,
-      sWidth: sourceWidth,
-      sHeight: sourceHeight
-    }
-  }
+  // Calculate dimensions that will fill the target area
+  let sWidth, sHeight, sx, sy
 
-  let sx, sy, sWidth, sHeight
-
-  if (sourceRatio > targetRatio) {
-    // Source is wider - crop the width
+  // Calculate scale to fit source into target aspect ratio
+  if (sourceWidth / sourceHeight > targetRatio) {
+    // Source is wider than target - fit to height
     sHeight = sourceHeight
     sWidth = sourceHeight * targetRatio
-    sy = 0
     sx = (sourceWidth - sWidth) / 2
+    sy = 0
   } else {
-    // Source is taller - crop the height
+    // Source is taller than target - fit to width
     sWidth = sourceWidth
     sHeight = sourceWidth / targetRatio
     sx = 0
     sy = (sourceHeight - sHeight) / 2
   }
 
-  return { sx, sy, sWidth, sHeight }
+  // Round values to avoid sub-pixel rendering
+  return {
+    sx: Math.round(sx),
+    sy: Math.round(sy),
+    sWidth: Math.round(sWidth),
+    sHeight: Math.round(sHeight)
+  }
 }
 
 const resizeVideo = (file, startTime, endTime, onProgress) => {
@@ -495,13 +512,34 @@ const DEFAULT_SETTINGS = {
     fps: 30
   },
   adjustments: {
-    contrast: 128,
-    highlights: 128,
-    shadows: 128,
-    midtones: 128,
-    brightness: 128,
-    hue: 128,
-    saturation: 128,
+    brightness: {
+      enabled: false,
+      value: 128
+    },
+    contrast: {
+      enabled: false,
+      value: 128
+    },
+    highlights: {
+      enabled: false,
+      value: 128
+    },
+    shadows: {
+      enabled: false,
+      value: 128
+    },
+    midtones: {
+      enabled: false,
+      value: 128
+    },
+    hue: {
+      enabled: false,
+      value: 128
+    },
+    saturation: {
+      enabled: false,
+      value: 128
+    },
     colorize: {
       enabled: false,
       color: '#42b883',
@@ -517,9 +555,9 @@ const DEFAULT_SETTINGS = {
     }
   },
   trim: {
+    enabled: false,
     start: 0,
-    end: 0,
-    enabled: false
+    end: 0
   }
 }
 
@@ -576,26 +614,30 @@ const hexToRgb = (hex) => {
 
 // Update the image processing in updatePreview and resizeVideo
 const processPixel = (r, g, b) => {
-  // Initialize variables
   let rr = r, gg = g, bb = b
 
   // Apply color reduction first if enabled and level is 1
   if (adjustments.value.colorReduce.enabled && adjustments.value.colorReduce.levels === 1) {
-    // Calculate luminance from original RGB values
     const luminance = Math.round(r * 0.299 + g * 0.587 + b * 0.114)
     return [luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0]
   }
 
   // Convert RGB to HSL and apply adjustments
   const [h, s, l] = rgbToHsl(rr, gg, bb)
+  let newH = h
+  let newS = s
 
   // Apply hue adjustment
-  let newH = h + (adjustments.value.hue - 128) * 1.4
-  newH = (newH + 360) % 360
+  if (adjustments.value.hue.enabled) {
+    newH = h + (adjustments.value.hue.value - 128) * 1.4
+    newH = (newH + 360) % 360
+  }
 
   // Apply saturation adjustment
-  let newS = s * (adjustments.value.saturation / 128)
-  newS = Math.max(0, Math.min(100, newS))
+  if (adjustments.value.saturation.enabled) {
+    newS = s * (adjustments.value.saturation.value / 128)
+    newS = Math.max(0, Math.min(100, newS))
+  }
 
   // Convert back to RGB
   const [r1, g1, b1] = hslToRgb(newH, newS, l)
@@ -603,26 +645,47 @@ const processPixel = (r, g, b) => {
   gg = g1
   bb = b1
 
-  // Apply other adjustments
-  for (let j = 0; j < 3; j++) {
-    let value = j === 0 ? rr : j === 1 ? gg : bb
+  // Apply basic adjustments
+  if (adjustments.value.brightness.enabled) {
+    rr += (adjustments.value.brightness.value - 128)
+    gg += (adjustments.value.brightness.value - 128)
+    bb += (adjustments.value.brightness.value - 128)
+  }
 
-    value += (adjustments.value.brightness - 128)
-    value = ((value - 128) * (adjustments.value.contrast / 128)) + 128
+  if (adjustments.value.contrast.enabled) {
+    rr = ((rr - 128) * (adjustments.value.contrast.value / 128)) + 128
+    gg = ((gg - 128) * (adjustments.value.contrast.value / 128)) + 128
+    bb = ((bb - 128) * (adjustments.value.contrast.value / 128)) + 128
+  }
 
-    // Add midtones adjustment between highlights and shadows
-    if (value > 128) {
-      value += (adjustments.value.highlights - 128) * ((value - 128) / 128)
-    } else if (value < 128) {
-      value += (adjustments.value.shadows - 128) * ((128 - value) / 128)
-    }
-    // Apply midtones adjustment with less effect near extremes
-    const midtoneFactor = 1 - Math.abs(value - 128) / 128
-    value += (adjustments.value.midtones - 128) * midtoneFactor
+  // Apply tone adjustments
+  if (adjustments.value.highlights.enabled && rr > 128) {
+    rr += (adjustments.value.highlights.value - 128) * ((rr - 128) / 128)
+  }
+  if (adjustments.value.highlights.enabled && gg > 128) {
+    gg += (adjustments.value.highlights.value - 128) * ((gg - 128) / 128)
+  }
+  if (adjustments.value.highlights.enabled && bb > 128) {
+    bb += (adjustments.value.highlights.value - 128) * ((bb - 128) / 128)
+  }
 
-    if (j === 0) rr = value
-    else if (j === 1) gg = value
-    else bb = value
+  if (adjustments.value.shadows.enabled && rr < 128) {
+    rr += (adjustments.value.shadows.value - 128) * ((128 - rr) / 128)
+  }
+  if (adjustments.value.shadows.enabled && gg < 128) {
+    gg += (adjustments.value.shadows.value - 128) * ((128 - gg) / 128)
+  }
+  if (adjustments.value.shadows.enabled && bb < 128) {
+    bb += (adjustments.value.shadows.value - 128) * ((128 - bb) / 128)
+  }
+
+  if (adjustments.value.midtones.enabled) {
+    const midtoneFactor = 1 - Math.abs(rr - 128) / 128
+    rr += (adjustments.value.midtones.value - 128) * midtoneFactor
+    const midtoneFactorG = 1 - Math.abs(gg - 128) / 128
+    gg += (adjustments.value.midtones.value - 128) * midtoneFactorG
+    const midtoneFactorB = 1 - Math.abs(bb - 128) / 128
+    bb += (adjustments.value.midtones.value - 128) * midtoneFactorB
   }
 
   // Apply color reduction for levels > 1
@@ -633,7 +696,7 @@ const processPixel = (r, g, b) => {
     bb = Math.round(Math.round(bb / step) * step)
   }
 
-  // Add invert effect (before colorize)
+  // Add invert effect
   if (adjustments.value.invert.enabled) {
     const strength = adjustments.value.invert.strength / 100
     rr = rr * (1 - strength) + (255 - rr) * strength
@@ -641,7 +704,7 @@ const processPixel = (r, g, b) => {
     bb = bb * (1 - strength) + (255 - bb) * strength
   }
 
-  // Apply colorize last
+  // Apply colorize
   if (adjustments.value.colorize.enabled) {
     const tintColor = hexToRgb(adjustments.value.colorize.color)
     const luminance = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255
@@ -668,7 +731,18 @@ const processVideoFrame = (imageData) => {
 }
 
 const handleVideoLoaded = (video) => {
-  // Handle any initialization needed when video loads
+  if (!videoMetadata.value) return
+
+  // Update aspect ratios
+  const gcd = (a, b) => b ? gcd(b, a % b) : a
+
+  // Source ratio
+  const sourceDiv = gcd(video.videoWidth, video.videoHeight)
+  videoMetadata.value.sourceAspectRatio = `${video.videoWidth / sourceDiv}:${video.videoHeight / sourceDiv}`
+
+  // Target ratio
+  const targetDiv = gcd(targetResolution.value.width, targetResolution.value.height)
+  videoMetadata.value.targetAspectRatio = `${targetResolution.value.width / targetDiv}:${targetResolution.value.height / targetDiv}`
 }
 
 const handleTrimReset = () => {
@@ -727,6 +801,58 @@ const cancelConversion = () => {
     abortController.value = null
   }
 }
+
+const randomizeSettings = () => {
+  const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min)
+  const randomBool = () => Math.random() > 0.5
+
+  const newAdjustments = {
+    ...adjustments.value,  // Keep the existing structure
+    brightness: {
+      enabled: randomBool(),
+      value: randomInt(0, 255)
+    },
+    contrast: {
+      enabled: randomBool(),
+      value: randomInt(0, 255)
+    },
+    highlights: {
+      enabled: randomBool(),
+      value: randomInt(0, 255)
+    },
+    shadows: {
+      enabled: randomBool(),
+      value: randomInt(0, 255)
+    },
+    midtones: {
+      enabled: randomBool(),
+      value: randomInt(0, 255)
+    },
+    hue: {
+      enabled: randomBool(),
+      value: randomInt(0, 255)
+    },
+    saturation: {
+      enabled: randomBool(),
+      value: randomInt(0, 255)
+    },
+    colorize: {
+      enabled: randomBool(),
+      color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
+      intensity: randomInt(0, 100)
+    },
+    colorReduce: {
+      enabled: randomBool(),
+      levels: randomInt(1, 6)
+    },
+    invert: {
+      enabled: randomBool(),
+      strength: randomInt(0, 100)
+    }
+  }
+
+  adjustments.value = newAdjustments
+}
 </script>
 <template>
   <div class="converter-container">
@@ -736,8 +862,10 @@ const cancelConversion = () => {
 
       <div v-if="videoMetadata" class="metadata">
         <h3>Video Information:</h3>
-        <p>Resolution: {{ videoMetadata.width }}x{{ videoMetadata.height }}</p>
-        <p>Aspect Ratio: {{ videoMetadata.aspectRatio }}</p>
+        <p>Original Resolution: {{ videoMetadata.width }}x{{ videoMetadata.height }}</p>
+        <p>Original Aspect Ratio: {{ videoMetadata.sourceAspectRatio }}</p>
+        <p>Target Resolution: {{ targetResolution.width }}x{{ targetResolution.height }}</p>
+        <p>Target Aspect Ratio: {{ videoMetadata.targetAspectRatio }}</p>
         <p>Duration: {{ videoMetadata.duration }}s</p>
         <p>Original FPS: {{ videoMetadata.fps }}</p>
       </div>

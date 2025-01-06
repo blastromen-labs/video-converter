@@ -16,58 +16,16 @@ const showPresetInput = ref(false)
 const showDropdown = ref(false)
 const selectedPreset = ref(null)
 
-const DEFAULT_PRESETS = [{
-    id: 'blastro-default',
-    name: 'Blastro',
-    settings: {
-        targetResolution: {
-            width: 40,
-            height: 96,
-            fps: 30
-        },
-        adjustments: {
-            contrast: 255,
-            highlights: 140,
-            midtones: 25,
-            shadows: 0,
-            brightness: 120,
-            hue: 40,
-            saturation: 160,
-            colorize: {
-                enabled: false,
-                color: '#42b883',
-                intensity: 50
-            },
-            colorReduce: {
-                enabled: false,
-                levels: 2
-            },
-            invert: {
-                enabled: false,
-                strength: 100
-            }
-        },
-        trimSettings: {
-            enabled: false,
-            start: 0,
-            end: 0
-        }
-    }
-}]
+const DEFAULT_PRESETS = {}
 
 // Load presets from cookies on mount
 onMounted(() => {
     const savedPresets = getCookie('video-converter-presets')
     if (savedPresets) {
         presets.value = JSON.parse(savedPresets)
-        // Add default preset if it doesn't exist
-        if (!presets.value.find(p => p.id === 'blastro-default')) {
-            presets.value.unshift(...DEFAULT_PRESETS)
-            saveToCookie()
-        }
     } else {
-        // If no presets exist, add the default ones
-        presets.value = [...DEFAULT_PRESETS]
+        // Start with empty presets
+        presets.value = []
         saveToCookie()
     }
 
@@ -147,36 +105,33 @@ const toggleDropdown = (event) => {
 
 <template>
     <div class="preset-manager">
-        <div class="preset-header">
-            <h4>Presets</h4>
-            <div class="preset-actions">
-                <div class="preset-dropdown" @click.stop>
-                    <button class="dropdown-toggle" @click="toggleDropdown">
-                        {{ selectedPreset?.name || 'Select Preset' }}
-                        <span class="dropdown-arrow" :class="{ 'arrow-up': showDropdown }">▼</span>
-                    </button>
-                    <div v-if="showDropdown" class="dropdown-menu">
-                        <div v-if="presets.length === 0" class="no-presets">
-                            No saved presets
-                        </div>
-                        <div v-else v-for="preset in presets" :key="preset.id" class="preset-item"
-                            @click="loadPreset(preset)" :class="{ 'selected': selectedPreset?.id === preset.id }">
-                            <span class="preset-name">{{ preset.name }}</span>
-                            <button class="delete-btn" @click="deletePreset(preset.id, $event)">
-                                ×
-                            </button>
-                        </div>
+        <div class="preset-actions">
+            <div class="preset-dropdown" @click.stop>
+                <button class="dropdown-toggle" @click="toggleDropdown">
+                    {{ selectedPreset?.name || 'Select Preset' }}
+                    <span class="dropdown-arrow" :class="{ 'arrow-up': showDropdown }">▼</span>
+                </button>
+                <div v-if="showDropdown" class="dropdown-menu">
+                    <div v-if="presets.length === 0" class="no-presets">
+                        No saved presets
+                    </div>
+                    <div v-else v-for="preset in presets" :key="preset.id" class="preset-item"
+                        @click="loadPreset(preset)" :class="{ 'selected': selectedPreset?.id === preset.id }">
+                        <span class="preset-name">{{ preset.name }}</span>
+                        <button class="delete-btn" @click="deletePreset(preset.id, $event)">
+                            ×
+                        </button>
                     </div>
                 </div>
-                <button class="save-btn" :disabled="!selectedPreset"
-                    :title="!selectedPreset ? 'Select a preset first' : 'Save current settings to selected preset'"
-                    @click="saveCurrentPreset">
-                    Save
-                </button>
-                <button class="save-new-btn" @click="showPresetInput = true">
-                    Save New
-                </button>
             </div>
+            <button class="save-btn" :disabled="!selectedPreset"
+                :title="!selectedPreset ? 'Select a preset first' : 'Save current settings to selected preset'"
+                @click="saveCurrentPreset">
+                Save
+            </button>
+            <button class="save-new-btn" @click="showPresetInput = true">
+                Save New
+            </button>
         </div>
 
         <div v-if="showPresetInput" class="preset-input">
@@ -191,22 +146,8 @@ const toggleDropdown = (event) => {
 
 <style>
 .preset-manager {
-    background: #1a1a1a;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-}
-
-.preset-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-}
-
-.preset-header h4 {
-    margin: 0;
-    color: #42b883;
 }
 
 .preset-actions {

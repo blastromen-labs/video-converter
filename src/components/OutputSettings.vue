@@ -42,30 +42,52 @@ const getCurrentSettings = () => ({
 
 const randomizeSettings = () => {
     const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min)
+    const randomBool = () => Math.random() > 0.5
 
     const newAdjustments = {
         ...props.adjustments,
-        contrast: randomInt(0, 255),
-        highlights: randomInt(0, 255),
-        midtones: randomInt(0, 255),
-        shadows: randomInt(0, 255),
-        brightness: randomInt(0, 255),
-        hue: randomInt(0, 255),
-        saturation: randomInt(0, 255),
+        brightness: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        contrast: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        highlights: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        shadows: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        midtones: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        hue: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        saturation: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
         colorize: {
             ...props.adjustments.colorize,
-            enabled: Math.random() > 0.5,
+            enabled: randomBool(),
             color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
             intensity: randomInt(0, 100)
         },
         colorReduce: {
             ...props.adjustments.colorReduce,
-            enabled: Math.random() > 0.5,
+            enabled: randomBool(),
             levels: randomInt(1, 6)
         },
         invert: {
             ...props.adjustments.invert,
-            enabled: Math.random() > 0.5,
+            enabled: randomBool(),
             strength: randomInt(0, 100)
         }
     }
@@ -76,19 +98,19 @@ const randomizeSettings = () => {
 
 <template>
     <div class="settings-panel">
-        <div class="settings-header">
-            <h3>Output Settings</h3>
-            <div class="settings-header-actions">
+        <div class="controls-row">
+            <div class="preset-controls">
+                <PresetManager :current-settings="getCurrentSettings()" @load-preset="handleLoadPreset" />
+            </div>
+            <div class="action-buttons">
                 <button class="randomize-btn" @click="randomizeSettings" title="Randomize adjustment settings">
                     Randomize
                 </button>
                 <button class="reset-settings-btn" @click="resetSettings" title="Reset all settings to default values">
-                    Reset Settings
+                    Reset
                 </button>
             </div>
         </div>
-
-        <PresetManager :current-settings="getCurrentSettings()" @load-preset="handleLoadPreset" />
 
         <div class="settings-group">
             <div class="resolution-settings">
@@ -108,201 +130,87 @@ const randomizeSettings = () => {
                         <input id="fps" type="number" v-model="targetResolution.fps" min="1" max="60"
                             @input="emit('update:targetResolution', { ...targetResolution })">
                     </div>
-                    <div class="input-group trim-toggle">
-                        <label for="trim-enabled">Trim:</label>
-                        <input id="trim-enabled" type="checkbox" v-model="trimSettings.enabled"
-                            @input="emit('update:trimSettings', { ...trimSettings })">
-                    </div>
                 </div>
 
-                <TrimVideo v-if="videoMetadata && trimSettings.enabled" v-model:enabled="trimSettings.enabled"
-                    v-model:startTime="trimSettings.start" v-model:endTime="trimSettings.end"
-                    :duration="videoMetadata?.duration || 0" :onReset="handleTrimReset" />
+                <div class="trim-section">
+                    <TrimVideo v-if="videoMetadata" v-model:enabled="trimSettings.enabled"
+                        v-model:startTime="trimSettings.start" v-model:endTime="trimSettings.end"
+                        :duration="videoMetadata?.duration || 0" :onReset="handleTrimReset" />
+                </div>
             </div>
 
             <div class="adjustment-controls">
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label class="adjustment-label">Brightness:</label>
-                        <div class="adjustment-inputs">
-                            <input type="range" v-model="adjustments.brightness" min="0" max="255"
-                                @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.brightness" min="0" max="255"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, brightness: defaultSettings.adjustments.brightness })"
-                            title="Reset brightness">
-                            ↺
-                        </button>
-                    </div>
-                </div>
+                <div class="adjustment-control" v-for="(value, key) in adjustments" :key="key">
+                    <div class="adjustment-row" v-if="typeof value === 'object'">
+                        <template v-if="'value' in value">
+                            <input type="checkbox" :checked="value.enabled" @input="emit('update:adjustments', {
+                                ...adjustments,
+                                [key]: { ...value, enabled: $event.target.checked }
+                            })" class="enable-checkbox">
+                            <label class="adjustment-label">{{ key.charAt(0).toUpperCase() + key.slice(1) }}:</label>
+                            <div class="adjustment-inputs" :class="{ disabled: !value.enabled }">
+                                <input type="range" :value="value.value" @input="emit('update:adjustments', {
+                                    ...adjustments,
+                                    [key]: { ...value, value: parseInt($event.target.value) }
+                                })" min="0" max="255" :disabled="!value.enabled">
+                                <input type="number" :value="value.value" @input="emit('update:adjustments', {
+                                    ...adjustments,
+                                    [key]: { ...value, value: parseInt($event.target.value) }
+                                })" min="0" max="255" class="adjustment-number" :disabled="!value.enabled">
+                            </div>
+                            <button class="reset-icon-btn" @click="emit('update:adjustments', {
+                                ...adjustments,
+                                [key]: { ...defaultSettings.adjustments[key] }
+                            })" title="Reset to default value">↺</button>
+                        </template>
 
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label class="adjustment-label">Contrast:</label>
-                        <div class="adjustment-inputs">
-                            <input id="contrast-slider" type="range" v-model="adjustments.contrast" min="0" max="255"
-                                step="1" @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.contrast" min="0" max="255"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, contrast: defaultSettings.adjustments.contrast })"
-                            title="Reset to default value">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label for="highlights" class="adjustment-label">Highlights:</label>
-                        <div class="adjustment-inputs">
-                            <input id="highlights-slider" type="range" v-model="adjustments.highlights" min="0"
-                                max="255" step="1" @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.highlights" min="0" max="255"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, highlights: defaultSettings.adjustments.highlights })"
-                            title="Reset to default value">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label for="midtones" class="adjustment-label">Midtones:</label>
-                        <div class="adjustment-inputs">
-                            <input id="midtones-slider" type="range" v-model="adjustments.midtones" min="0" max="255"
-                                step="1" @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.midtones" min="0" max="255"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, midtones: defaultSettings.adjustments.midtones })"
-                            title="Reset to default value">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label for="shadows" class="adjustment-label">Shadows:</label>
-                        <div class="adjustment-inputs">
-                            <input id="shadows-slider" type="range" v-model="adjustments.shadows" min="0" max="255"
-                                step="1" @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.shadows" min="0" max="255"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, shadows: defaultSettings.adjustments.shadows })"
-                            title="Reset to default value">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label for="hue" class="adjustment-label">Hue:</label>
-                        <div class="adjustment-inputs">
-                            <input id="hue-slider" type="range" v-model="adjustments.hue" min="0" max="255" step="1"
-                                @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.hue" min="0" max="255" class="adjustment-number"
-                                @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, hue: defaultSettings.adjustments.hue })"
-                            title="Reset to default value">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <label for="saturation" class="adjustment-label">Saturation:</label>
-                        <div class="adjustment-inputs">
-                            <input id="saturation-slider" type="range" v-model="adjustments.saturation" min="0"
-                                max="255" step="1" @input="emit('update:adjustments', { ...adjustments })">
-                            <input type="number" v-model="adjustments.saturation" min="0" max="255"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, saturation: defaultSettings.adjustments.saturation })"
-                            title="Reset to default value">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <input type="checkbox" v-model="adjustments.colorize.enabled"
-                            @input="emit('update:adjustments', { ...adjustments })" class="enable-checkbox">
-                        <label class="adjustment-label">Colorize:</label>
-                        <div class="adjustment-inputs" :class="{ disabled: !adjustments.colorize.enabled }">
-                            <input type="color" v-model="adjustments.colorize.color" class="small-color-picker"
-                                @input="emit('update:adjustments', { ...adjustments })"
-                                :disabled="!adjustments.colorize.enabled">
-                            <input type="range" v-model="adjustments.colorize.intensity" min="0" max="100" step="1"
-                                @input="emit('update:adjustments', { ...adjustments })"
-                                :disabled="!adjustments.colorize.enabled">
-                            <input type="number" v-model="adjustments.colorize.intensity" min="0" max="100"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })"
-                                :disabled="!adjustments.colorize.enabled">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, colorize: { ...defaultSettings.adjustments.colorize } })"
-                            title="Reset colorize settings">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <input type="checkbox" v-model="adjustments.colorReduce.enabled"
-                            @input="emit('update:adjustments', { ...adjustments })" class="enable-checkbox">
-                        <label class="adjustment-label">Color Reduction:</label>
-                        <div class="adjustment-inputs" :class="{ disabled: !adjustments.colorReduce.enabled }">
-                            <input type="range" v-model="adjustments.colorReduce.levels" min="1" max="6" step="1"
-                                @input="emit('update:adjustments', { ...adjustments })"
-                                :disabled="!adjustments.colorReduce.enabled">
-                            <input type="number" v-model="adjustments.colorReduce.levels" min="1" max="6"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })"
-                                :disabled="!adjustments.colorReduce.enabled">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, colorReduce: { ...defaultSettings.adjustments.colorReduce } })"
-                            title="Reset color reduction">
-                            ↺
-                        </button>
-                    </div>
-                </div>
-
-                <div class="adjustment-control">
-                    <div class="adjustment-row">
-                        <input type="checkbox" v-model="adjustments.invert.enabled"
-                            @input="emit('update:adjustments', { ...adjustments })" class="enable-checkbox">
-                        <label class="adjustment-label">Invert:</label>
-                        <div class="adjustment-inputs" :class="{ disabled: !adjustments.invert.enabled }">
-                            <input type="range" v-model="adjustments.invert.strength" min="0" max="100" step="1"
-                                @input="emit('update:adjustments', { ...adjustments })"
-                                :disabled="!adjustments.invert.enabled">
-                            <input type="number" v-model="adjustments.invert.strength" min="0" max="100"
-                                class="adjustment-number" @input="emit('update:adjustments', { ...adjustments })"
-                                :disabled="!adjustments.invert.enabled">
-                        </div>
-                        <button class="reset-icon-btn"
-                            @click="emit('update:adjustments', { ...adjustments, invert: { ...defaultSettings.adjustments.invert } })"
-                            title="Reset invert">
-                            ↺
-                        </button>
+                        <template v-else>
+                            <input type="checkbox" :checked="value.enabled" @input="emit('update:adjustments', {
+                                ...adjustments,
+                                [key]: { ...value, enabled: $event.target.checked }
+                            })" class="enable-checkbox">
+                            <label class="adjustment-label">{{ key.charAt(0).toUpperCase() + key.slice(1) }}:</label>
+                            <div class="adjustment-inputs" :class="{ disabled: !value.enabled }">
+                                <template v-if="key === 'colorize'">
+                                    <input type="color" :value="value.color" @input="emit('update:adjustments', {
+                                        ...adjustments,
+                                        colorize: { ...value, color: $event.target.value }
+                                    })" :disabled="!value.enabled" class="small-color-picker">
+                                    <input type="range" :value="value.intensity" @input="emit('update:adjustments', {
+                                        ...adjustments,
+                                        colorize: { ...value, intensity: parseInt($event.target.value) }
+                                    })" min="0" max="100" :disabled="!value.enabled">
+                                    <input type="number" :value="value.intensity" @input="emit('update:adjustments', {
+                                        ...adjustments,
+                                        colorize: { ...value, intensity: parseInt($event.target.value) }
+                                    })" min="0" max="100" class="adjustment-number" :disabled="!value.enabled">
+                                </template>
+                                <template v-else-if="key === 'colorReduce'">
+                                    <input type="range" :value="value.levels" @input="emit('update:adjustments', {
+                                        ...adjustments,
+                                        colorReduce: { ...value, levels: parseInt($event.target.value) }
+                                    })" min="1" max="8" :disabled="!value.enabled">
+                                    <input type="number" :value="value.levels" @input="emit('update:adjustments', {
+                                        ...adjustments,
+                                        colorReduce: { ...value, levels: parseInt($event.target.value) }
+                                    })" min="1" max="8" class="adjustment-number" :disabled="!value.enabled">
+                                </template>
+                                <template v-else-if="key === 'invert'">
+                                    <input type="range" :value="value.strength" @input="emit('update:adjustments', {
+                                        ...adjustments,
+                                        invert: { ...value, strength: parseInt($event.target.value) }
+                                    })" min="0" max="100" :disabled="!value.enabled">
+                                    <input type="number" :value="value.strength" @input="emit('update:adjustments', {
+                                        ...adjustments,
+                                        invert: { ...value, strength: parseInt($event.target.value) }
+                                    })" min="0" max="100" class="adjustment-number" :disabled="!value.enabled">
+                                </template>
+                            </div>
+                            <button class="reset-icon-btn" @click="emit('update:adjustments', {
+                                ...adjustments,
+                                [key]: { ...defaultSettings.adjustments[key] }
+                            })" title="Reset to default value">↺</button>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -311,7 +219,23 @@ const randomizeSettings = () => {
 </template>
 
 <style>
-.settings-header-actions {
+.controls-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.preset-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.action-buttons {
     display: flex;
     gap: 8px;
 }
@@ -326,8 +250,22 @@ const randomizeSettings = () => {
     font-size: 0.9em;
 }
 
+.reset-settings-btn {
+    background: #666;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
 .randomize-btn:hover {
     background: #6a3899;
+}
+
+.reset-settings-btn:hover {
+    background: #777;
 }
 
 .settings-group {
@@ -545,5 +483,13 @@ input[type="color"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
+}
+
+.trim-section {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    background: #2a2a2a;
+    border-radius: 4px;
+    padding: 6px 8px;
 }
 </style>
