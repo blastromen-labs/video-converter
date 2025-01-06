@@ -143,75 +143,111 @@ const cropToAspectRatio = (sourceWidth, sourceHeight, targetWidth, targetHeight)
   return { sx, sy, sWidth, sHeight }
 }
 
-const resizeVideo = (file) => {
-  return new Promise((resolve) => {
+const resizeVideo = (file, startTime, endTime, onProgress) => {
+  return new Promise((resolve, reject) => {
     const video = document.createElement('video')
-    let frames = []
+    video.preload = 'auto'
 
-    video.onloadedmetadata = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = targetResolution.value.width
-      canvas.height = targetResolution.value.height
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    const frames = []
+    let currentFrame = 0
+    const canvas = document.createElement('canvas')
+    canvas.width = targetResolution.value.width
+    canvas.height = targetResolution.value.height
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
 
-      const startTime = trimSettings.value.enabled ? trimSettings.value.start : 0
-      const endTime = trimSettings.value.enabled ? trimSettings.value.end : video.duration
-      const duration = endTime - startTime
+    const cleanup = () => {
+      URL.revokeObjectURL(video.src)
+      video.onloadedmetadata = null
+      video.onseeked = null
+      video.onerror = null
+    }
 
-      const totalFrames = Math.floor(duration * targetResolution.value.fps)
-      let currentFrame = 0
+    const finishConversion = () => {
+      const totalSize = frames.reduce((sum, frame) => sum + frame.length, 0)
+      const finalData = new Uint8Array(totalSize)
+      let offset = 0
+      frames.forEach(frame => {
+        finalData.set(frame, offset)
+        offset += frame.length
+      })
+      cleanup()
+      resolve(finalData)
+    }
 
-      const processFrame = () => {
-        // Calculate crop dimensions
-        const crop = cropToAspectRatio(
-          video.videoWidth,
-          video.videoHeight,
-          targetResolution.value.width,
-          targetResolution.value.height
-        )
+    video.onerror = () => {
+      cleanup()
+      reject(new Error('Video loading failed'))
+    }
 
-        // Draw with crop
-        ctx.drawImage(
-          video,
-          crop.sx, crop.sy, crop.sWidth, crop.sHeight,  // Source (cropped) rectangle
-          0, 0, canvas.width, canvas.height              // Destination rectangle
-        )
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-        const data = imageData.data
-        const frameData = new Uint8Array(canvas.width * canvas.height * 3)
-        let frameIndex = 0
-
-        for (let i = 0; i < data.length; i += 4) {
-          // Use processPixel instead of inline processing
-          const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
-          frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(r)))
-          frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(g)))
-          frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(b)))
+    const processFrame = () => {
+      try {
+        if (abortController.value?.signal.aborted) {
+          cleanup()
+          reject(new Error('Conversion cancelled'))
+          return
         }
 
-        frames.push(frameData)
-        currentFrame++
+        const totalFrames = Math.ceil((endTime - startTime) * targetResolution.value.fps)
 
         if (currentFrame < totalFrames) {
-          video.currentTime = startTime + (currentFrame / targetResolution.value.fps)
-        } else {
-          URL.revokeObjectURL(video.src)
-          const totalSize = frames.reduce((sum, frame) => sum + frame.length, 0)
-          const finalData = new Uint8Array(totalSize)
-          let offset = 0
-          frames.forEach(frame => {
-            finalData.set(frame, offset)
-            offset += frame.length
-          })
-          resolve(finalData)
-        }
-      }
+          // Calculate crop dimensions
+          const crop = cropToAspectRatio(
+            video.videoWidth,
+            video.videoHeight,
+            targetResolution.value.width,
+            targetResolution.value.height
+          )
 
-      video.onseeked = processFrame
+          // Draw with crop
+          ctx.drawImage(
+            video,
+            crop.sx, crop.sy, crop.sWidth, crop.sHeight,
+            0, 0, canvas.width, canvas.height
+          )
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const data = imageData.data
+          const frameData = new Uint8Array(canvas.width * canvas.height * 3)
+          let frameIndex = 0
+
+          for (let i = 0; i < data.length; i += 4) {
+            const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
+            frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(r)))
+            frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(g)))
+            frameData[frameIndex++] = Math.max(0, Math.min(255, Math.round(b)))
+          }
+
+          frames.push(frameData)
+          currentFrame++
+          onProgress?.(currentFrame)
+
+          const nextTime = startTime + (currentFrame / targetResolution.value.fps)
+          if (nextTime <= endTime) {
+            video.currentTime = nextTime
+          } else {
+            finishConversion()
+          }
+        } else {
+          finishConversion()
+        }
+      } catch (error) {
+        cleanup()
+        reject(error)
+      }
+    }
+
+    video.onloadedmetadata = () => {
+      // Validate time values after we have video duration
+      if (!Number.isFinite(startTime) || !Number.isFinite(endTime) ||
+        startTime < 0 || endTime > video.duration || startTime >= endTime) {
+        cleanup()
+        reject(new Error(`Invalid time range: ${startTime} - ${endTime} (duration: ${video.duration})`))
+        return
+      }
       video.currentTime = startTime
     }
 
+    video.onseeked = processFrame
     video.src = URL.createObjectURL(file)
   })
 }
@@ -339,15 +375,52 @@ const handleFile = async (file) => {
   }
 }
 
-const handleDrop = async (e) => {
-  e.preventDefault()
-  const file = e.dataTransfer.files[0]
-  await handleFile(file)
+// Add selectedFile ref
+const selectedFile = ref(null)
+
+// Update handleFileSelect
+const handleFileSelect = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  selectedFile.value = file
+  fileName.value = file.name.replace(/\.[^/.]+$/, '') + '.bin'
+
+  try {
+    videoMetadata.value = await getVideoMetadata(file)
+    previewUrl.value = URL.createObjectURL(file)
+
+    // Set initial trim end time
+    trimSettings.value.end = videoMetadata.value.duration
+
+    // Don't automatically convert
+    settingsChanged.value = true
+  } catch (error) {
+    console.error('Failed to load video:', error)
+  }
 }
 
-const handleFileSelect = async (e) => {
-  const file = e.target.files[0]
-  await handleFile(file)
+// Update handleDrop
+const handleDrop = async (event) => {
+  event.preventDefault()
+  const file = event.dataTransfer.files[0]
+  if (!file) return
+
+  selectedFile.value = file
+  fileName.value = file.name.replace(/\.[^/.]+$/, '') + '.bin'
+
+  try {
+    videoMetadata.value = await getVideoMetadata(file)
+    previewUrl.value = URL.createObjectURL(file)
+
+    // Set initial trim end time
+    trimSettings.value.end = videoMetadata.value.duration
+
+    // Don't automatically convert
+    settingsChanged.value = true
+  } catch (error) {
+    console.error('Failed to load video:', error)
+  }
 }
 
 const preventDefault = (e) => {
@@ -602,6 +675,58 @@ const handleTrimReset = () => {
   trimSettings.value.start = 0
   trimSettings.value.end = videoMetadata.value?.duration || 0
 }
+
+// Add progress state
+const conversionProgress = ref(0)
+
+// Add abort controller ref
+const abortController = ref(null)
+
+// Modify the conversion function to support cancellation
+const convertVideo = async (file) => {
+  if (isConverting.value) return // Prevent multiple conversions
+
+  isConverting.value = true
+  conversionProgress.value = 0
+  abortController.value = new AbortController()
+
+  try {
+    const startTime = trimSettings.value.enabled ? trimSettings.value.start : 0
+    const endTime = trimSettings.value.enabled ? trimSettings.value.end : videoMetadata.value.duration
+    const totalFrames = Math.ceil((endTime - startTime) * targetResolution.value.fps)
+
+    const data = await resizeVideo(file, startTime, endTime, (currentFrame) => {
+      if (abortController.value?.signal.aborted) {
+        throw new Error('Conversion cancelled')
+      }
+      conversionProgress.value = (currentFrame / totalFrames) * 100
+    })
+
+    const blob = new Blob([data], { type: 'application/octet-stream' })
+    convertedFile.value = URL.createObjectURL(blob)
+    settingsChanged.value = false
+    conversionProgress.value = 100
+  } catch (error) {
+    if (error.message !== 'Conversion cancelled') {
+      console.error('Conversion failed:', error)
+    }
+    // Clear the converted file if conversion was cancelled or failed
+    convertedFile.value = null
+    settingsChanged.value = true
+  } finally {
+    isConverting.value = false
+    abortController.value = null
+    conversionProgress.value = 0
+  }
+}
+
+// Add cancel function
+const cancelConversion = () => {
+  if (abortController.value) {
+    abortController.value.abort()
+    abortController.value = null
+  }
+}
 </script>
 <template>
   <div class="converter-container">
@@ -622,19 +747,27 @@ const handleTrimReset = () => {
       <div class="preview-header">
         <h4>Video Preview</h4>
         <div class="preview-actions">
-          <span v-if="isConverting" class="converting-status">Converting...</span>
-          <div v-if="convertedFile && !isConverting" class="button-group">
-            <a :href="convertedFile" :download="fileName" class="download-btn">
+          <div v-if="isConverting" class="converting-status">
+            <span>Converting...</span>
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: conversionProgress + '%' }"></div>
+            </div>
+            <button class="cancel-btn" @click="cancelConversion">
+              Cancel
+            </button>
+          </div>
+          <div v-else-if="previewUrl" class="button-group">
+            <button v-if="!convertedFile || settingsChanged" class="convert-btn" @click="convertVideo(selectedFile)">
+              {{ convertedFile ? 'Reconvert' : 'Convert' }}
+            </button>
+            <a v-if="convertedFile && !settingsChanged" :href="convertedFile" :download="fileName" class="download-btn">
               Download .bin
             </a>
-            <button v-if="settingsChanged" class="reconvert-btn" @click="reconvert" :disabled="isConverting">
-              Reconvert
-            </button>
             <button class="reset-btn" @click="handleNewFile">
               New file
             </button>
           </div>
-          <div v-if="!previewUrl && !isConverting" class="button-group">
+          <div v-else class="button-group">
             <button class="reset-btn" @click="handleNewFile">
               Select video file
             </button>
@@ -654,3 +787,54 @@ const handleTrimReset = () => {
     </div>
   </div>
 </template>
+
+<style>
+/* Add these styles */
+.converting-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar {
+  width: 200px;
+  height: 6px;
+  background: #2a2a2a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #42b883;
+  transition: width 0.3s ease;
+}
+
+.cancel-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.cancel-btn:hover {
+  background: #ff2222;
+}
+
+.convert-btn {
+  background: #42b883;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.convert-btn:hover {
+  background: #3aa876;
+}
+</style>
