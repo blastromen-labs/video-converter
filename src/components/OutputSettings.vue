@@ -54,6 +54,18 @@ const randomizeSettings = () => {
             enabled: randomBool(),
             value: randomInt(0, 255)
         },
+        redLevel: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        greenLevel: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        blueLevel: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
         highlights: {
             enabled: randomBool(),
             value: randomInt(0, 255)

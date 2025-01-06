@@ -34,6 +34,18 @@ const adjustments = ref({
     enabled: false,
     value: 128
   },
+  redLevel: {
+    enabled: false,
+    value: 128
+  },
+  greenLevel: {
+    enabled: false,
+    value: 128
+  },
+  blueLevel: {
+    enabled: false,
+    value: 128
+  },
   highlights: {
     enabled: false,
     value: 128
@@ -520,6 +532,18 @@ const DEFAULT_SETTINGS = {
       enabled: false,
       value: 128
     },
+    redLevel: {
+      enabled: false,
+      value: 128
+    },
+    greenLevel: {
+      enabled: false,
+      value: 128
+    },
+    blueLevel: {
+      enabled: false,
+      value: 128
+    },
     highlights: {
       enabled: false,
       value: 128
@@ -616,9 +640,20 @@ const hexToRgb = (hex) => {
 const processPixel = (r, g, b) => {
   let rr = r, gg = g, bb = b
 
+  // Apply RGB level adjustments first
+  if (adjustments.value.redLevel.enabled) {
+    rr = Math.min(255, rr * (adjustments.value.redLevel.value / 128))
+  }
+  if (adjustments.value.greenLevel.enabled) {
+    gg = Math.min(255, gg * (adjustments.value.greenLevel.value / 128))
+  }
+  if (adjustments.value.blueLevel.enabled) {
+    bb = Math.min(255, bb * (adjustments.value.blueLevel.value / 128))
+  }
+
   // Apply color reduction first if enabled and level is 1
   if (adjustments.value.colorReduce.enabled && adjustments.value.colorReduce.levels === 1) {
-    const luminance = Math.round(r * 0.299 + g * 0.587 + b * 0.114)
+    const luminance = Math.round(rr * 0.299 + gg * 0.587 + bb * 0.114)
     return [luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0]
   }
 
@@ -801,58 +836,6 @@ const cancelConversion = () => {
     abortController.value = null
   }
 }
-
-const randomizeSettings = () => {
-  const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min)
-  const randomBool = () => Math.random() > 0.5
-
-  const newAdjustments = {
-    ...adjustments.value,  // Keep the existing structure
-    brightness: {
-      enabled: randomBool(),
-      value: randomInt(0, 255)
-    },
-    contrast: {
-      enabled: randomBool(),
-      value: randomInt(0, 255)
-    },
-    highlights: {
-      enabled: randomBool(),
-      value: randomInt(0, 255)
-    },
-    shadows: {
-      enabled: randomBool(),
-      value: randomInt(0, 255)
-    },
-    midtones: {
-      enabled: randomBool(),
-      value: randomInt(0, 255)
-    },
-    hue: {
-      enabled: randomBool(),
-      value: randomInt(0, 255)
-    },
-    saturation: {
-      enabled: randomBool(),
-      value: randomInt(0, 255)
-    },
-    colorize: {
-      enabled: randomBool(),
-      color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
-      intensity: randomInt(0, 100)
-    },
-    colorReduce: {
-      enabled: randomBool(),
-      levels: randomInt(1, 6)
-    },
-    invert: {
-      enabled: randomBool(),
-      strength: randomInt(0, 100)
-    }
-  }
-
-  adjustments.value = newAdjustments
-}
 </script>
 <template>
   <div class="converter-container">
@@ -915,54 +898,3 @@ const randomizeSettings = () => {
     </div>
   </div>
 </template>
-
-<style>
-/* Add these styles */
-.converting-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.progress-bar {
-  width: 200px;
-  height: 6px;
-  background: #2a2a2a;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #42b883;
-  transition: width 0.3s ease;
-}
-
-.cancel-btn {
-  background: #ff4444;
-  color: white;
-  border: none;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9em;
-}
-
-.cancel-btn:hover {
-  background: #ff2222;
-}
-
-.convert-btn {
-  background: #42b883;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.convert-btn:hover {
-  background: #3aa876;
-}
-</style>

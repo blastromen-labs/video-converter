@@ -767,3 +767,52 @@ button:focus-visible {
 .invert-controls .adjustment-inputs.disabled {
   opacity: 0.5;
 }
+
+/* Add these styles */
+.converting-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar {
+  width: 200px;
+  height: 6px;
+  background: #2a2a2a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #42b883;
+  transition: width 0.3s ease;
+}
+
+.cancel-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.cancel-btn:hover {
+  background: #ff2222;
+}
+
+.convert-btn {
+  background: #42b883;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.convert-btn:hover {
+  background: #3aa876;
+}
