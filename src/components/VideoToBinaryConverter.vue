@@ -37,6 +37,10 @@ const adjustments = ref({
   colorReduce: {
     enabled: false,
     levels: 2, // 2 for black/white, can go up to 256 for full color
+  },
+  invert: {
+    enabled: false,
+    strength: 100
   }
 })
 
@@ -74,7 +78,7 @@ const getVideoMetadata = (file) => {
       // Calculate simplified ratio
       const gcd = (a, b) => b ? gcd(b, a % b) : a
       const divisor = gcd(width, height)
-      const simplifiedRatio = `${width/divisor}:${height/divisor}`
+      const simplifiedRatio = `${width / divisor}:${height / divisor}`
 
       // Get framerate if available
       let fps = 30; // default fallback
@@ -248,18 +252,18 @@ const hslToRgb = (h, s, l) => {
     const hue2rgb = (p, q, t) => {
       if (t < 0) t += 1
       if (t > 1) t -= 1
-      if (t < 1/6) return p + (q - p) * 6 * t
-      if (t < 1/2) return q
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+      if (t < 1 / 6) return p + (q - p) * 6 * t
+      if (t < 1 / 2) return q
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
       return p
     }
 
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s
     const p = 2 * l - q
 
-    r = hue2rgb(p, q, h + 1/3)
+    r = hue2rgb(p, q, h + 1 / 3)
     g = hue2rgb(p, q, h)
-    b = hue2rgb(p, q, h - 1/3)
+    b = hue2rgb(p, q, h - 1 / 3)
   }
 
   return [r * 255, g * 255, b * 255]
@@ -428,6 +432,10 @@ const DEFAULT_SETTINGS = {
     colorReduce: {
       enabled: false,
       levels: 2
+    },
+    invert: {
+      enabled: false,
+      strength: 100
     }
   },
   trim: {
@@ -544,6 +552,14 @@ const processPixel = (r, g, b) => {
     bb = Math.round(Math.round(bb / step) * step)
   }
 
+  // Add invert effect (before colorize)
+  if (adjustments.value.invert.enabled) {
+    const strength = adjustments.value.invert.strength / 100
+    rr = rr * (1 - strength) + (255 - rr) * strength
+    gg = gg * (1 - strength) + (255 - gg) * strength
+    bb = bb * (1 - strength) + (255 - bb) * strength
+  }
+
   // Apply colorize last
   if (adjustments.value.colorize.enabled) {
     const tintColor = hexToRgb(adjustments.value.colorize.color)
@@ -565,11 +581,7 @@ const processPixel = (r, g, b) => {
       <div class="settings-panel">
         <div class="settings-header">
           <h3>Output Settings</h3>
-          <button
-            class="reset-settings-btn"
-            @click="resetSettings"
-            title="Reset all settings to default values"
-          >
+          <button class="reset-settings-btn" @click="resetSettings" title="Reset all settings to default values">
             Reset Settings
           </button>
         </div>
@@ -577,31 +589,15 @@ const processPixel = (r, g, b) => {
           <div class="resolution-inputs">
             <div class="input-group">
               <label for="width">Width:</label>
-              <input
-                id="width"
-                type="number"
-                v-model="targetResolution.width"
-                min="1"
-              >
+              <input id="width" type="number" v-model="targetResolution.width" min="1">
             </div>
             <div class="input-group">
               <label for="height">Height:</label>
-              <input
-                id="height"
-                type="number"
-                v-model="targetResolution.height"
-                min="1"
-              >
+              <input id="height" type="number" v-model="targetResolution.height" min="1">
             </div>
             <div class="input-group">
               <label for="fps">FPS:</label>
-              <input
-                id="fps"
-                type="number"
-                v-model="targetResolution.fps"
-                min="1"
-                max="60"
-              >
+              <input id="fps" type="number" v-model="targetResolution.fps" min="1" max="60">
             </div>
           </div>
 
@@ -609,225 +605,111 @@ const processPixel = (r, g, b) => {
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label for="contrast">Contrast:</label>
-                <button
-                  class="reset-value-btn"
-                  @click="adjustments.contrast = DEFAULT_SETTINGS.adjustments.contrast"
-                  title="Reset to default value"
-                >
+                <button class="reset-value-btn" @click="adjustments.contrast = DEFAULT_SETTINGS.adjustments.contrast"
+                  title="Reset to default value">
                   Reset
                 </button>
               </div>
               <div class="adjustment-inputs">
-                <input
-                  id="contrast-slider"
-                  type="range"
-                  v-model="adjustments.contrast"
-                  min="0"
-                  max="255"
-                  step="1"
-                >
-                <input
-                  type="number"
-                  v-model="adjustments.contrast"
-                  min="0"
-                  max="255"
-                  class="adjustment-number"
-                >
+                <input id="contrast-slider" type="range" v-model="adjustments.contrast" min="0" max="255" step="1">
+                <input type="number" v-model="adjustments.contrast" min="0" max="255" class="adjustment-number">
               </div>
             </div>
 
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label for="highlights">Highlights:</label>
-                <button
-                  class="reset-value-btn"
+                <button class="reset-value-btn"
                   @click="adjustments.highlights = DEFAULT_SETTINGS.adjustments.highlights"
-                  title="Reset to default value"
-                >
+                  title="Reset to default value">
                   Reset
                 </button>
               </div>
               <div class="adjustment-inputs">
-                <input
-                  id="highlights-slider"
-                  type="range"
-                  v-model="adjustments.highlights"
-                  min="0"
-                  max="255"
-                  step="1"
-                >
-                <input
-                  type="number"
-                  v-model="adjustments.highlights"
-                  min="0"
-                  max="255"
-                  class="adjustment-number"
-                >
+                <input id="highlights-slider" type="range" v-model="adjustments.highlights" min="0" max="255" step="1">
+                <input type="number" v-model="adjustments.highlights" min="0" max="255" class="adjustment-number">
               </div>
             </div>
 
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label for="shadows">Shadows:</label>
-                <button
-                  class="reset-value-btn"
-                  @click="adjustments.shadows = DEFAULT_SETTINGS.adjustments.shadows"
-                  title="Reset to default value"
-                >
+                <button class="reset-value-btn" @click="adjustments.shadows = DEFAULT_SETTINGS.adjustments.shadows"
+                  title="Reset to default value">
                   Reset
                 </button>
               </div>
               <div class="adjustment-inputs">
-                <input
-                  id="shadows-slider"
-                  type="range"
-                  v-model="adjustments.shadows"
-                  min="0"
-                  max="255"
-                  step="1"
-                >
-                <input
-                  type="number"
-                  v-model="adjustments.shadows"
-                  min="0"
-                  max="255"
-                  class="adjustment-number"
-                >
+                <input id="shadows-slider" type="range" v-model="adjustments.shadows" min="0" max="255" step="1">
+                <input type="number" v-model="adjustments.shadows" min="0" max="255" class="adjustment-number">
               </div>
             </div>
 
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label for="brightness">Brightness:</label>
-                <button
-                  class="reset-value-btn"
+                <button class="reset-value-btn"
                   @click="adjustments.brightness = DEFAULT_SETTINGS.adjustments.brightness"
-                  title="Reset to default value"
-                >
+                  title="Reset to default value">
                   Reset
                 </button>
               </div>
               <div class="adjustment-inputs">
-                <input
-                  id="brightness-slider"
-                  type="range"
-                  v-model="adjustments.brightness"
-                  min="0"
-                  max="255"
-                  step="1"
-                >
-                <input
-                  type="number"
-                  v-model="adjustments.brightness"
-                  min="0"
-                  max="255"
-                  class="adjustment-number"
-                >
+                <input id="brightness-slider" type="range" v-model="adjustments.brightness" min="0" max="255" step="1">
+                <input type="number" v-model="adjustments.brightness" min="0" max="255" class="adjustment-number">
               </div>
             </div>
 
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label for="hue">Hue:</label>
-                <button
-                  class="reset-value-btn"
-                  @click="adjustments.hue = DEFAULT_SETTINGS.adjustments.hue"
-                  title="Reset to default value"
-                >
+                <button class="reset-value-btn" @click="adjustments.hue = DEFAULT_SETTINGS.adjustments.hue"
+                  title="Reset to default value">
                   Reset
                 </button>
               </div>
               <div class="adjustment-inputs">
-                <input
-                  id="hue-slider"
-                  type="range"
-                  v-model="adjustments.hue"
-                  min="0"
-                  max="255"
-                  step="1"
-                >
-                <input
-                  type="number"
-                  v-model="adjustments.hue"
-                  min="0"
-                  max="255"
-                  class="adjustment-number"
-                >
+                <input id="hue-slider" type="range" v-model="adjustments.hue" min="0" max="255" step="1">
+                <input type="number" v-model="adjustments.hue" min="0" max="255" class="adjustment-number">
               </div>
             </div>
 
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label for="saturation">Saturation:</label>
-                <button
-                  class="reset-value-btn"
+                <button class="reset-value-btn"
                   @click="adjustments.saturation = DEFAULT_SETTINGS.adjustments.saturation"
-                  title="Reset to default value"
-                >
+                  title="Reset to default value">
                   Reset
                 </button>
               </div>
               <div class="adjustment-inputs">
-                <input
-                  id="saturation-slider"
-                  type="range"
-                  v-model="adjustments.saturation"
-                  min="0"
-                  max="255"
-                  step="1"
-                >
-                <input
-                  type="number"
-                  v-model="adjustments.saturation"
-                  min="0"
-                  max="255"
-                  class="adjustment-number"
-                >
+                <input id="saturation-slider" type="range" v-model="adjustments.saturation" min="0" max="255" step="1">
+                <input type="number" v-model="adjustments.saturation" min="0" max="255" class="adjustment-number">
               </div>
             </div>
 
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label>Colorize:</label>
-                <button
-                  class="reset-value-btn"
+                <button class="reset-value-btn"
                   @click="adjustments.colorize = { ...DEFAULT_SETTINGS.adjustments.colorize }"
-                  title="Reset colorize settings"
-                >
+                  title="Reset colorize settings">
                   Reset
                 </button>
               </div>
               <div class="colorize-controls">
                 <label class="toggle">
-                  <input
-                    type="checkbox"
-                    v-model="adjustments.colorize.enabled"
-                  >
+                  <input type="checkbox" v-model="adjustments.colorize.enabled">
                   Enable colorize
                 </label>
                 <div class="color-picker-group" :class="{ disabled: !adjustments.colorize.enabled }">
-                  <input
-                    type="color"
-                    v-model="adjustments.colorize.color"
-                    :disabled="!adjustments.colorize.enabled"
-                  >
+                  <input type="color" v-model="adjustments.colorize.color" :disabled="!adjustments.colorize.enabled">
                   <div class="adjustment-inputs">
-                    <input
-                      type="range"
-                      v-model="adjustments.colorize.intensity"
-                      min="0"
-                      max="100"
-                      step="1"
-                      :disabled="!adjustments.colorize.enabled"
-                    >
-                    <input
-                      type="number"
-                      v-model="adjustments.colorize.intensity"
-                      min="0"
-                      max="100"
-                      class="adjustment-number"
-                      :disabled="!adjustments.colorize.enabled"
-                    >
+                    <input type="range" v-model="adjustments.colorize.intensity" min="0" max="100" step="1"
+                      :disabled="!adjustments.colorize.enabled">
+                    <input type="number" v-model="adjustments.colorize.intensity" min="0" max="100"
+                      class="adjustment-number" :disabled="!adjustments.colorize.enabled">
                   </div>
                 </div>
               </div>
@@ -836,39 +718,44 @@ const processPixel = (r, g, b) => {
             <div class="adjustment-control">
               <div class="adjustment-header">
                 <label>Color Reduction:</label>
-                <button
-                  class="reset-value-btn"
+                <button class="reset-value-btn"
                   @click="adjustments.colorReduce = { ...DEFAULT_SETTINGS.adjustments.colorReduce }"
-                  title="Reset color reduction"
-                >
+                  title="Reset color reduction">
                   Reset
                 </button>
               </div>
               <div class="color-reduce-controls">
                 <label class="toggle">
-                  <input
-                    type="checkbox"
-                    v-model="adjustments.colorReduce.enabled"
-                  >
+                  <input type="checkbox" v-model="adjustments.colorReduce.enabled">
                   Enable color reduction
                 </label>
                 <div class="adjustment-inputs" :class="{ disabled: !adjustments.colorReduce.enabled }">
-                  <input
-                    type="range"
-                    v-model="adjustments.colorReduce.levels"
-                    min="1"
-                    max="6"
-                    step="1"
-                    :disabled="!adjustments.colorReduce.enabled"
-                  >
-                  <input
-                    type="number"
-                    v-model="adjustments.colorReduce.levels"
-                    min="1"
-                    max="6"
-                    class="adjustment-number"
-                    :disabled="!adjustments.colorReduce.enabled"
-                  >
+                  <input type="range" v-model="adjustments.colorReduce.levels" min="1" max="6" step="1"
+                    :disabled="!adjustments.colorReduce.enabled">
+                  <input type="number" v-model="adjustments.colorReduce.levels" min="1" max="6"
+                    class="adjustment-number" :disabled="!adjustments.colorReduce.enabled">
+                </div>
+              </div>
+            </div>
+
+            <div class="adjustment-control">
+              <div class="adjustment-header">
+                <label>Invert:</label>
+                <button class="reset-value-btn" @click="adjustments.invert = { ...DEFAULT_SETTINGS.adjustments.invert }"
+                  title="Reset invert">
+                  Reset
+                </button>
+              </div>
+              <div class="invert-controls">
+                <label class="toggle">
+                  <input type="checkbox" v-model="adjustments.invert.enabled">
+                  Enable invert
+                </label>
+                <div class="adjustment-inputs" :class="{ disabled: !adjustments.invert.enabled }">
+                  <input type="range" v-model="adjustments.invert.strength" min="0" max="100" step="1"
+                    :disabled="!adjustments.invert.enabled">
+                  <input type="number" v-model="adjustments.invert.strength" min="0" max="100" class="adjustment-number"
+                    :disabled="!adjustments.invert.enabled">
                 </div>
               </div>
             </div>
@@ -878,18 +765,11 @@ const processPixel = (r, g, b) => {
             <div class="trim-header">
               <h4>Trim Video</h4>
               <div class="trim-header-controls">
-                <button
-                  class="reset-value-btn"
-                  @click="resetTrimTimes"
-                  title="Reset trim times"
-                >
+                <button class="reset-value-btn" @click="resetTrimTimes" title="Reset trim times">
                   Reset
                 </button>
                 <label class="trim-toggle">
-                  <input
-                    type="checkbox"
-                    v-model="trimSettings.enabled"
-                  >
+                  <input type="checkbox" v-model="trimSettings.enabled">
                   Enable trim
                 </label>
               </div>
@@ -899,59 +779,32 @@ const processPixel = (r, g, b) => {
               <div class="trim-input">
                 <label for="trim-start">Start Time:</label>
                 <div class="time-input-group">
-                  <input
-                    id="trim-start"
-                    type="text"
-                    :value="formatTime(trimSettings.start)"
-                    @change="e => trimSettings.start = parseTime(e.target.value)"
-                    :disabled="!trimSettings.enabled"
-                    pattern="[0-9]+:[0-5][0-9].[0-9]{3}"
-                    placeholder="0:00.000"
-                  >
+                  <input id="trim-start" type="text" :value="formatTime(trimSettings.start)"
+                    @change="e => trimSettings.start = parseTime(e.target.value)" :disabled="!trimSettings.enabled"
+                    pattern="[0-9]+:[0-5][0-9].[0-9]{3}" placeholder="0:00.000">
                   <div class="time-controls">
-                    <button
-                      @click="incrementTime('start', 1)"
-                      :disabled="!trimSettings.enabled"
-                      title="Add 1 second"
-                    >
+                    <button @click="incrementTime('start', 1)" :disabled="!trimSettings.enabled" title="Add 1 second">
                       ▲
                     </button>
-                    <button
-                      @click="incrementTime('start', -1)"
-                      :disabled="!trimSettings.enabled"
-                      title="Subtract 1 second"
-                    >
+                    <button @click="incrementTime('start', -1)" :disabled="!trimSettings.enabled"
+                      title="Subtract 1 second">
                       ▼
                     </button>
                   </div>
                 </div>
               </div>
-
               <div class="trim-input">
                 <label for="trim-end">End Time:</label>
                 <div class="time-input-group">
-                  <input
-                    id="trim-end"
-                    type="text"
-                    :value="formatTime(trimSettings.end)"
-                    @change="e => trimSettings.end = parseTime(e.target.value)"
-                    :disabled="!trimSettings.enabled"
-                    pattern="[0-9]+:[0-5][0-9].[0-9]{3}"
-                    placeholder="0:00.000"
-                  >
+                  <input id="trim-end" type="text" :value="formatTime(trimSettings.end)"
+                    @change="e => trimSettings.end = parseTime(e.target.value)" :disabled="!trimSettings.enabled"
+                    pattern="[0-9]+:[0-5][0-9].[0-9]{3}" placeholder="0:00.000">
                   <div class="time-controls">
-                    <button
-                      @click="incrementTime('end', 1)"
-                      :disabled="!trimSettings.enabled"
-                      title="Add 1 second"
-                    >
+                    <button @click="incrementTime('end', 1)" :disabled="!trimSettings.enabled" title="Add 1 second">
                       ▲
                     </button>
-                    <button
-                      @click="incrementTime('end', -1)"
-                      :disabled="!trimSettings.enabled"
-                      title="Subtract 1 second"
-                    >
+                    <button @click="incrementTime('end', -1)" :disabled="!trimSettings.enabled"
+                      title="Subtract 1 second">
                       ▼
                     </button>
                   </div>
@@ -968,19 +821,14 @@ const processPixel = (r, g, b) => {
         <p>Aspect Ratio: {{ videoMetadata.aspectRatio }}</p>
         <p>Duration: {{ videoMetadata.duration }}s</p>
         <p>Original FPS: {{ videoMetadata.fps }}</p>
-    </div>
+      </div>
 
-    <div v-if="isConverting" class="converting">
-      Converting...
+      <div v-if="isConverting" class="converting">
+        Converting...
       </div>
     </div>
 
-    <div
-      class="preview-section"
-      @drop="handleDrop"
-      @dragover="preventDefault"
-      @dragenter="preventDefault"
-    >
+    <div class="preview-section" @drop="handleDrop" @dragover="preventDefault" @dragenter="preventDefault">
       <div class="preview-header">
         <h4>Video Preview</h4>
         <div class="preview-actions">
@@ -989,50 +837,28 @@ const processPixel = (r, g, b) => {
             <a :href="convertedFile" :download="fileName" class="download-btn">
               Download .bin
             </a>
-            <button
-              v-if="settingsChanged"
-              class="reconvert-btn"
-              @click="reconvert"
-              :disabled="isConverting"
-            >
+            <button v-if="settingsChanged" class="reconvert-btn" @click="reconvert" :disabled="isConverting">
               Reconvert
             </button>
-            <button
-              class="reset-btn"
-              @click="handleNewFile"
-            >
+            <button class="reset-btn" @click="handleNewFile">
               New file
             </button>
           </div>
           <div v-if="!previewUrl && !isConverting" class="button-group">
-            <button
-              class="reset-btn"
-              @click="handleNewFile"
-            >
+            <button class="reset-btn" @click="handleNewFile">
               Select video file
             </button>
           </div>
         </div>
       </div>
 
-      <input
-        ref="fileInput"
-        type="file"
-        accept="video/mp4,video/quicktime"
-        class="hidden"
-        @change="handleFileSelect"
-      >
+      <input ref="fileInput" type="file" accept="video/mp4,video/quicktime" class="hidden" @change="handleFileSelect">
 
       <div class="preview-row" v-if="previewUrl">
         <div class="preview-box">
           <h5>Original</h5>
-          <video
-            ref="videoPreview"
-            :src="previewUrl"
-            controls
-            @loadeddata="updatePreview"
-            @timeupdate="updatePreview"
-          ></video>
+          <video ref="videoPreview" :src="previewUrl" controls @loadeddata="updatePreview"
+            @timeupdate="updatePreview"></video>
           <div v-if="videoMetadata" class="video-info">
             <div class="info-row">
               <span>Resolution:</span>
@@ -1055,12 +881,8 @@ const processPixel = (r, g, b) => {
 
         <div class="preview-box">
           <h5>Conversion</h5>
-          <canvas
-            ref="previewCanvas"
-            :width="targetResolution.width"
-            :height="targetResolution.height"
-            class="preview-canvas"
-          ></canvas>
+          <canvas ref="previewCanvas" :width="targetResolution.width" :height="targetResolution.height"
+            class="preview-canvas"></canvas>
         </div>
       </div>
 
@@ -1070,680 +892,3 @@ const processPixel = (r, g, b) => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.drop-zone {
-  display: none;
-}
-
-.preview-section {
-  position: sticky;
-  top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  height: fit-content;
-  background: #1a1a1a;
-  padding: 20px;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.preview-section:hover {
-  border-color: #42b883;
-  background: rgba(26, 26, 26, 0.95);
-  box-shadow: 0 0 0 2px rgba(66, 184, 131, 0.3);
-}
-
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 32px;
-}
-
-.preview-actions .button-group {
-  display: flex;
-  gap: 8px;
-}
-
-.preview-actions .button-group > * {
-  padding: 4px 12px;
-  font-size: 0.8em;
-  border-radius: 3px;
-  font-weight: 500;
-  white-space: nowrap;
-  min-width: 80px;
-}
-
-.download-btn {
-  background-color: #42b883;
-  color: white;
-  text-decoration: none;
-}
-
-.reset-btn {
-  background-color: #333;
-  color: white;
-  border: none;
-}
-
-.download-btn:hover,
-.reset-btn:hover {
-  opacity: 0.9;
-}
-
-.hidden {
-  display: none;
-}
-
-.select-btn {
-  background-color: #42b883;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-  margin-top: 8px;
-  font-size: 0.9em;
-}
-
-.select-btn:hover {
-  opacity: 0.9;
-}
-
-.metadata {
-  display: none;
-}
-
-.converter-container {
-  display: grid;
-  grid-template-columns: 1fr 800px;
-  gap: 20px;
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 20px;
-  align-items: start;
-}
-
-.main-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.preview-section h4 {
-  margin: 0 0 10px 0;
-  color: #42b883;
-}
-
-.preview-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.preview-box {
-  background: #2a2a2a;
-  padding: 15px;
-  border-radius: 8px;
-}
-
-.preview-box h5 {
-  margin: 0 0 10px 0;
-  color: #888;
-  font-size: 0.9em;
-}
-
-.preview-box video,
-.preview-box canvas {
-  width: 100%;
-  border-radius: 4px;
-  max-height: 600px;
-  object-fit: contain;
-  background: #000;
-}
-
-.preview-canvas {
-  image-rendering: pixelated;
-  border: 1px solid #333;
-  width: 100%;
-  height: auto !important;
-  aspect-ratio: 40/96;
-}
-
-.settings-panel {
-  background-color: #1a1a1a;
-  padding: 20px;
-  border-radius: 8px;
-  height: calc(100% - 40px);
-  position: sticky;
-  top: 20px;
-}
-
-.settings-panel h3 {
-  margin: 0 0 15px 0;
-  color: #42b883;
-}
-
-.resolution-inputs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-
-.input-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.input-group label {
-  color: #888;
-}
-
-.input-group input {
-  background-color: #2a2a2a;
-  border: 1px solid #333;
-  color: #fff;
-  width: 70px;
-  padding: 5px;
-  border-radius: 4px;
-}
-
-.settings-group {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
-  padding-right: 10px;
-}
-
-.settings-group::-webkit-scrollbar {
-  width: 8px;
-}
-
-.settings-group::-webkit-scrollbar-track {
-  background: #1a1a1a;
-}
-
-.settings-group::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 4px;
-}
-
-.settings-group::-webkit-scrollbar-thumb:hover {
-  background: #444;
-}
-
-.adjustment-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.adjustment-control {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.adjustment-control label {
-  color: #888;
-}
-
-.adjustment-inputs {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.adjustment-inputs input[type="range"] {
-  flex: 1;
-  height: 4px;
-  border-radius: 2px;
-  background: #333;
-  outline: none;
-  -webkit-appearance: none;
-}
-
-.adjustment-inputs input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #42b883;
-  cursor: pointer;
-}
-
-.adjustment-inputs input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #42b883;
-  cursor: pointer;
-  border: none;
-}
-
-.adjustment-number {
-  width: 60px;
-  padding: 5px;
-  border: 1px solid #333;
-  border-radius: 4px;
-  text-align: center;
-  background-color: #2a2a2a;
-  color: #fff;
-}
-
-/* Responsive design for smaller screens */
-@media (max-width: 1400px) {
-  .converter-container {
-    grid-template-columns: 1fr;
-  }
-
-  .preview-section {
-    position: static;
-  }
-
-  .preview-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.trim-controls {
-  background: #2a2a2a;
-  padding: 15px;
-  border-radius: 4px;
-  border: 1px solid #333;
-}
-
-.trim-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.trim-header h4 {
-  margin: 0;
-  color: #42b883;
-}
-
-.trim-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #888;
-  cursor: pointer;
-}
-
-.trim-inputs {
-  display: flex;
-  gap: 20px;
-}
-
-.trim-inputs.disabled {
-  opacity: 0.5;
-}
-
-.trim-input {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  flex: 1;
-}
-
-.trim-input label {
-  color: #888;
-  font-size: 0.9em;
-}
-
-.trim-input input {
-  padding: 8px;
-  border: 1px solid #333;
-  border-radius: 4px;
-  font-family: monospace;
-  background-color: #2a2a2a;
-  color: #fff;
-}
-
-.trim-input input:disabled {
-  background-color: #222;
-  color: #666;
-}
-
-.button-group {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-}
-
-.reconvert-btn {
-  background-color: #ff9800;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.reconvert-btn:hover {
-  opacity: 0.9;
-}
-
-.reconvert-btn:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.settings-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.settings-header h3 {
-  margin: 0;
-}
-
-.reset-settings-btn {
-  background-color: #333;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background-color 0.2s;
-}
-
-.reset-settings-btn:hover {
-  background-color: #444;
-}
-
-.adjustment-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.reset-value-btn {
-  background: none;
-  border: none;
-  color: #666;
-  font-size: 0.8em;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-  transition: all 0.2s;
-}
-
-.reset-value-btn:hover {
-  background-color: #333;
-  color: #fff;
-}
-
-.trim-header-controls {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.time-input-group {
-  display: flex;
-  align-items: stretch;
-  gap: 5px;
-}
-
-.time-input-group input {
-  flex: 1;
-  font-family: monospace;
-  font-size: 1.1em;
-  text-align: center;
-}
-
-.time-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.time-controls button {
-  background: #333;
-  border: none;
-  color: #888;
-  width: 24px;
-  height: 20px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 3px;
-  font-size: 0.8em;
-  transition: all 0.2s;
-}
-
-.time-controls button:hover {
-  background: #444;
-  color: #fff;
-}
-
-.time-controls button:disabled {
-  background: #222;
-  color: #444;
-  cursor: not-allowed;
-}
-
-.video-info {
-  margin-top: 10px;
-  padding: 8px;
-  background: #1a1a1a;
-  border-radius: 4px;
-  font-size: 0.8em;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  color: #888;
-  margin: 2px 0;
-}
-
-.info-row span:first-child {
-  color: #666;
-}
-
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 32px;
-}
-
-.preview-actions .button-group {
-  display: flex;
-  gap: 8px;
-}
-
-.preview-actions .button-group > * {
-  padding: 4px 12px;
-  font-size: 0.8em;
-  border-radius: 3px;
-  font-weight: 500;
-  white-space: nowrap;
-  min-width: 80px;
-}
-
-.download-btn {
-  background-color: #42b883;
-  color: white;
-  text-decoration: none;
-  text-align: center;
-}
-
-.reconvert-btn {
-  background-color: #ff9800;
-  color: white;
-  border: none;
-}
-
-.reset-btn {
-  background-color: #333;
-  color: white;
-  border: none;
-}
-
-.download-btn:hover,
-.reconvert-btn:hover,
-.reset-btn:hover {
-  opacity: 0.9;
-}
-
-.reconvert-btn:disabled {
-  background-color: #666;
-  cursor: not-allowed;
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  min-height: 32px;
-}
-
-.preview-header h4 {
-  margin: 0;
-  color: #42b883;
-}
-
-.preview-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.preview-actions .button-group {
-  display: flex;
-  gap: 8px;
-}
-
-.preview-actions .button-group > * {
-  padding: 4px 12px;
-  font-size: 0.8em;
-  border-radius: 3px;
-  font-weight: 500;
-  white-space: nowrap;
-  min-width: 80px;
-}
-
-.converting-status {
-  color: #888;
-  font-size: 0.9em;
-  font-style: italic;
-  min-width: 80px;
-  text-align: right;
-}
-
-/* Remove old preview-actions styles */
-.preview-section > .preview-actions {
-  display: none;
-}
-
-/* Update button styles to be more compact */
-.download-btn {
-  background-color: #42b883;
-  color: white;
-  text-decoration: none;
-}
-
-.reconvert-btn {
-  background-color: #ff9800;
-  color: white;
-  border: none;
-}
-
-.reset-btn {
-  background-color: #333;
-  color: white;
-  border: none;
-}
-
-.preview-box video {
-  width: 100%;
-  height: auto !important;
-  aspect-ratio: 40/96;
-  object-fit: contain;
-}
-
-/* Add placeholder styles */
-.preview-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 400px;
-  background: #2a2a2a;
-  border-radius: 8px;
-  color: #666;
-  font-style: italic;
-  border: 2px dashed #333;
-}
-
-.colorize-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #888;
-  cursor: pointer;
-}
-
-.color-picker-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.color-picker-group.disabled {
-  opacity: 0.5;
-}
-
-.color-picker-group input[type="color"] {
-  width: 100%;
-  height: 30px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: none;
-}
-
-.color-picker-group input[type="color"]::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-picker-group input[type="color"]::-webkit-color-swatch {
-  border: none;
-  border-radius: 4px;
-}
-
-.color-reduce-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.color-reduce-controls .adjustment-inputs.disabled {
-  opacity: 0.5;
-}
-</style>
