@@ -1,6 +1,37 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 
+const cropToAspectRatio = (sourceWidth, sourceHeight, targetWidth, targetHeight) => {
+    // Calculate target aspect ratio from output dimensions
+    const targetRatio = targetWidth / targetHeight
+
+    // Calculate dimensions that will fill the target area
+    let sWidth, sHeight, sx, sy
+
+    // Calculate scale to fit source into target aspect ratio
+    if (sourceWidth / sourceHeight > targetRatio) {
+        // Source is wider than target - fit to height
+        sHeight = sourceHeight
+        sWidth = sourceHeight * targetRatio
+        sx = (sourceWidth - sWidth) / 2
+        sy = 0
+    } else {
+        // Source is taller than target - fit to width
+        sWidth = sourceWidth
+        sHeight = sourceWidth / targetRatio
+        sx = 0
+        sy = (sourceHeight - sHeight) / 2
+    }
+
+    // Round values to avoid sub-pixel rendering
+    return {
+        sx: Math.round(sx),
+        sy: Math.round(sy),
+        sWidth: Math.round(sWidth),
+        sHeight: Math.round(sHeight)
+    }
+}
+
 const props = defineProps({
     videoUrl: String,
     metadata: Object,
@@ -15,29 +46,28 @@ const videoRef = ref(null)
 const canvasRef = ref(null)
 let frameRequestId = null
 
+const computedDimensions = computed(() => {
+    if (!videoRef.value) return null
+    const video = videoRef.value
+    return cropToAspectRatio(
+        video.videoWidth,
+        video.videoHeight,
+        props.previewWidth,
+        props.previewHeight
+    )
+})
+
 const updatePreview = async () => {
-    if (!videoRef.value || !canvasRef.value) return
+    if (!videoRef.value || !canvasRef.value || !videoRef.value.readyState >= 2) return
 
     const ctx = canvasRef.value.getContext('2d', { willReadFrequently: true })
     const video = videoRef.value
-
-    // Calculate source and target ratios for cropping
-    const sourceRatio = video.videoWidth / video.videoHeight
-    const targetRatio = props.previewWidth / props.previewHeight
-
-    let sx = 0, sy = 0, sWidth = video.videoWidth, sHeight = video.videoHeight
-
-    if (sourceRatio > targetRatio) {
-        sWidth = video.videoHeight * targetRatio
-        sx = (video.videoWidth - sWidth) / 2
-    } else {
-        sHeight = video.videoWidth / targetRatio
-        sy = (video.videoHeight - sHeight) / 2
-    }
+    const dimensions = computedDimensions.value
+    if (!dimensions) return
 
     ctx.drawImage(
         video,
-        sx, sy, sWidth, sHeight,
+        dimensions.sx, dimensions.sy, dimensions.sWidth, dimensions.sHeight,
         0, 0, canvasRef.value.width, canvasRef.value.height
     )
 
@@ -46,15 +76,21 @@ const updatePreview = async () => {
         props.processFrame(imageData)
         ctx.putImageData(imageData, 0, 0)
     }
+}
 
-    frameRequestId = requestAnimationFrame(updatePreview)
+const startPreviewLoop = () => {
+    if (frameRequestId) cancelAnimationFrame(frameRequestId)
+    frameRequestId = requestAnimationFrame(() => {
+        updatePreview()
+        startPreviewLoop()
+    })
 }
 
 const handleVideoLoaded = () => {
     if (props.onVideoLoaded) {
         props.onVideoLoaded(videoRef.value)
     }
-    updatePreview()
+    startPreviewLoop()
 }
 
 const formatDuration = (seconds) => {
@@ -80,15 +116,29 @@ const displaySize = computed(() => {
 onMounted(() => {
     if (videoRef.value) {
         videoRef.value.addEventListener('loadeddata', handleVideoLoaded)
+        if (videoRef.value.readyState >= 2) {
+            handleVideoLoaded()
+        }
     }
 })
 
 onUnmounted(() => {
     if (frameRequestId) {
         cancelAnimationFrame(frameRequestId)
+        frameRequestId = null
     }
     if (videoRef.value) {
         videoRef.value.removeEventListener('loadeddata', handleVideoLoaded)
+    }
+})
+
+watch(() => props.videoUrl, () => {
+    if (frameRequestId) {
+        cancelAnimationFrame(frameRequestId)
+        frameRequestId = null
+    }
+    if (videoRef.value && videoRef.value.readyState >= 2) {
+        startPreviewLoop()
     }
 })
 </script>
@@ -98,7 +148,8 @@ onUnmounted(() => {
         <div class="preview-box">
             <h5>Original</h5>
             <div class="preview-container">
-                <video ref="videoRef" :src="videoUrl" controls @timeupdate="updatePreview"></video>
+                <video ref="videoRef" :src="videoUrl" controls preload="auto" crossorigin="anonymous"
+                    playsinline></video>
             </div>
             <div v-if="metadata" class="video-info">
                 <div class="info-row">

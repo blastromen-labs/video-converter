@@ -106,6 +106,26 @@ const randomizeSettings = () => {
 
     emit('update:adjustments', newAdjustments)
 }
+
+// Add throttle utility
+const throttle = (fn, delay) => {
+    let lastCall = 0
+    return (...args) => {
+        const now = Date.now()
+        if (now - lastCall >= delay) {
+            fn(...args)
+            lastCall = now
+        }
+    }
+}
+
+// Use throttle for slider updates
+const throttledEmit = throttle((type, value) => {
+    emit('update:adjustments', {
+        ...props.adjustments,
+        [type]: { ...props.adjustments[type], value: parseInt(value) }
+    })
+}, 32)
 </script>
 
 <template>
@@ -161,10 +181,9 @@ const randomizeSettings = () => {
                             })" class="enable-checkbox">
                             <label class="adjustment-label">{{ key.charAt(0).toUpperCase() + key.slice(1) }}:</label>
                             <div class="adjustment-inputs" :class="{ disabled: !value.enabled }">
-                                <input type="range" :value="value.value" @input="emit('update:adjustments', {
-                                    ...adjustments,
-                                    [key]: { ...value, value: parseInt($event.target.value) }
-                                })" min="0" max="255" :disabled="!value.enabled">
+                                <input type="range" :value="value.value"
+                                    @input="throttledEmit(key, $event.target.value)" min="0" max="255"
+                                    :disabled="!value.enabled">
                                 <input type="number" :value="value.value" @input="emit('update:adjustments', {
                                     ...adjustments,
                                     [key]: { ...value, value: parseInt($event.target.value) }

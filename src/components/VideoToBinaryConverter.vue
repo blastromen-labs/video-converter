@@ -339,36 +339,44 @@ const hslToRgb = (h, s, l) => {
 }
 
 const updatePreview = async () => {
-  if (!videoPreview.value || !previewCanvas.value) return
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      if (!videoPreview.value || !previewCanvas.value) {
+        resolve()
+        return
+      }
 
-  const ctx = previewCanvas.value.getContext('2d', { willReadFrequently: true })
+      const ctx = previewCanvas.value.getContext('2d', { willReadFrequently: true })
 
-  const crop = cropToAspectRatio(
-    videoPreview.value.videoWidth,
-    videoPreview.value.videoHeight,
-    targetResolution.value.width,
-    targetResolution.value.height
-  )
+      const crop = cropToAspectRatio(
+        videoPreview.value.videoWidth,
+        videoPreview.value.videoHeight,
+        targetResolution.value.width,
+        targetResolution.value.height
+      )
 
-  ctx.drawImage(
-    videoPreview.value,
-    crop.sx, crop.sy, crop.sWidth, crop.sHeight,
-    0, 0, previewCanvas.value.width, previewCanvas.value.height
-  )
+      ctx.drawImage(
+        videoPreview.value,
+        crop.sx, crop.sy, crop.sWidth, crop.sHeight,
+        0, 0, previewCanvas.value.width, previewCanvas.value.height
+      )
 
-  const imageData = ctx.getImageData(0, 0, previewCanvas.value.width, previewCanvas.value.height)
-  const data = imageData.data
+      const imageData = ctx.getImageData(0, 0, previewCanvas.value.width, previewCanvas.value.height)
+      const data = imageData.data
 
-  for (let i = 0; i < data.length; i += 4) {
-    // Use processPixel instead of inline processing
-    const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
-    data[i] = r
-    data[i + 1] = g
-    data[i + 2] = b
-    data[i + 3] = 255
-  }
+      for (let i = 0; i < data.length; i += 4) {
+        // Use processPixel instead of inline processing
+        const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
+        data[i] = r
+        data[i + 1] = g
+        data[i + 2] = b
+        data[i + 3] = 255
+      }
 
-  ctx.putImageData(imageData, 0, 0)
+      ctx.putImageData(imageData, 0, 0)
+      resolve()
+    })
+  })
 }
 
 const handleFile = async (file) => {
@@ -506,14 +514,24 @@ const resetConverter = () => {
   }
 }
 
-// Watch for changes in contrast threshold to update preview
-watch(contrastThreshold, () => {
-  updatePreview()
-})
+// Add debounce utility
+const debounce = (fn, delay) => {
+  let timeoutId
+  return (...args) => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn(...args), delay)
+  }
+}
 
-// Update watcher to watch all adjustments
-watch(adjustments, () => {
+// Debounce the preview update
+const debouncedUpdate = debounce(() => {
+  if (!videoPreview.value || !previewCanvas.value) return
   updatePreview()
+}, 32) // ~30fps for better performance
+
+// Watch adjustments with debounced update
+watch(adjustments, () => {
+  debouncedUpdate()
 }, { deep: true })
 
 // Add default values as constants
@@ -640,19 +658,30 @@ const hexToRgb = (hex) => {
 const processPixel = (r, g, b) => {
   let rr = r, gg = g, bb = b
 
+  // Cache adjustments to avoid repeated property lookups
+  const adj = adjustments.value
+
+  // Skip processing if no adjustments are enabled
+  if (!Object.values(adj).some(a => a.enabled)) {
+    return [rr, gg, bb]
+  }
+
   // Apply RGB level adjustments first
-  if (adjustments.value.redLevel.enabled) {
-    rr = Math.min(255, rr * (adjustments.value.redLevel.value / 128))
+  if (adj.redLevel.enabled) {
+    const factor = adj.redLevel.value / 128
+    rr = Math.min(255, rr * factor)
   }
-  if (adjustments.value.greenLevel.enabled) {
-    gg = Math.min(255, gg * (adjustments.value.greenLevel.value / 128))
+  if (adj.greenLevel.enabled) {
+    const factor = adj.greenLevel.value / 128
+    gg = Math.min(255, gg * factor)
   }
-  if (adjustments.value.blueLevel.enabled) {
-    bb = Math.min(255, bb * (adjustments.value.blueLevel.value / 128))
+  if (adj.blueLevel.enabled) {
+    const factor = adj.blueLevel.value / 128
+    bb = Math.min(255, bb * factor)
   }
 
   // Apply color reduction first if enabled and level is 1
-  if (adjustments.value.colorReduce.enabled && adjustments.value.colorReduce.levels === 1) {
+  if (adj.colorReduce.enabled && adj.colorReduce.levels === 1) {
     const luminance = Math.round(rr * 0.299 + gg * 0.587 + bb * 0.114)
     return [luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0]
   }
@@ -663,14 +692,14 @@ const processPixel = (r, g, b) => {
   let newS = s
 
   // Apply hue adjustment
-  if (adjustments.value.hue.enabled) {
-    newH = h + (adjustments.value.hue.value - 128) * 1.4
+  if (adj.hue.enabled) {
+    newH = h + (adj.hue.value - 128) * 1.4
     newH = (newH + 360) % 360
   }
 
   // Apply saturation adjustment
-  if (adjustments.value.saturation.enabled) {
-    newS = s * (adjustments.value.saturation.value / 128)
+  if (adj.saturation.enabled) {
+    newS = s * (adj.saturation.value / 128)
     newS = Math.max(0, Math.min(100, newS))
   }
 
@@ -681,70 +710,70 @@ const processPixel = (r, g, b) => {
   bb = b1
 
   // Apply basic adjustments
-  if (adjustments.value.brightness.enabled) {
-    rr += (adjustments.value.brightness.value - 128)
-    gg += (adjustments.value.brightness.value - 128)
-    bb += (adjustments.value.brightness.value - 128)
+  if (adj.brightness.enabled) {
+    rr += (adj.brightness.value - 128)
+    gg += (adj.brightness.value - 128)
+    bb += (adj.brightness.value - 128)
   }
 
-  if (adjustments.value.contrast.enabled) {
-    rr = ((rr - 128) * (adjustments.value.contrast.value / 128)) + 128
-    gg = ((gg - 128) * (adjustments.value.contrast.value / 128)) + 128
-    bb = ((bb - 128) * (adjustments.value.contrast.value / 128)) + 128
+  if (adj.contrast.enabled) {
+    rr = ((rr - 128) * (adj.contrast.value / 128)) + 128
+    gg = ((gg - 128) * (adj.contrast.value / 128)) + 128
+    bb = ((bb - 128) * (adj.contrast.value / 128)) + 128
   }
 
   // Apply tone adjustments
-  if (adjustments.value.highlights.enabled && rr > 128) {
-    rr += (adjustments.value.highlights.value - 128) * ((rr - 128) / 128)
+  if (adj.highlights.enabled && rr > 128) {
+    rr += (adj.highlights.value - 128) * ((rr - 128) / 128)
   }
-  if (adjustments.value.highlights.enabled && gg > 128) {
-    gg += (adjustments.value.highlights.value - 128) * ((gg - 128) / 128)
+  if (adj.highlights.enabled && gg > 128) {
+    gg += (adj.highlights.value - 128) * ((gg - 128) / 128)
   }
-  if (adjustments.value.highlights.enabled && bb > 128) {
-    bb += (adjustments.value.highlights.value - 128) * ((bb - 128) / 128)
-  }
-
-  if (adjustments.value.shadows.enabled && rr < 128) {
-    rr += (adjustments.value.shadows.value - 128) * ((128 - rr) / 128)
-  }
-  if (adjustments.value.shadows.enabled && gg < 128) {
-    gg += (adjustments.value.shadows.value - 128) * ((128 - gg) / 128)
-  }
-  if (adjustments.value.shadows.enabled && bb < 128) {
-    bb += (adjustments.value.shadows.value - 128) * ((128 - bb) / 128)
+  if (adj.highlights.enabled && bb > 128) {
+    bb += (adj.highlights.value - 128) * ((bb - 128) / 128)
   }
 
-  if (adjustments.value.midtones.enabled) {
+  if (adj.shadows.enabled && rr < 128) {
+    rr += (adj.shadows.value - 128) * ((128 - rr) / 128)
+  }
+  if (adj.shadows.enabled && gg < 128) {
+    gg += (adj.shadows.value - 128) * ((128 - gg) / 128)
+  }
+  if (adj.shadows.enabled && bb < 128) {
+    bb += (adj.shadows.value - 128) * ((128 - bb) / 128)
+  }
+
+  if (adj.midtones.enabled) {
     const midtoneFactor = 1 - Math.abs(rr - 128) / 128
-    rr += (adjustments.value.midtones.value - 128) * midtoneFactor
+    rr += (adj.midtones.value - 128) * midtoneFactor
     const midtoneFactorG = 1 - Math.abs(gg - 128) / 128
-    gg += (adjustments.value.midtones.value - 128) * midtoneFactorG
+    gg += (adj.midtones.value - 128) * midtoneFactorG
     const midtoneFactorB = 1 - Math.abs(bb - 128) / 128
-    bb += (adjustments.value.midtones.value - 128) * midtoneFactorB
+    bb += (adj.midtones.value - 128) * midtoneFactorB
   }
 
   // Apply color reduction for levels > 1
-  if (adjustments.value.colorReduce.enabled && adjustments.value.colorReduce.levels > 1) {
-    const step = 256 / (adjustments.value.colorReduce.levels - 1)
+  if (adj.colorReduce.enabled && adj.colorReduce.levels > 1) {
+    const step = 256 / (adj.colorReduce.levels - 1)
     rr = Math.round(Math.round(rr / step) * step)
     gg = Math.round(Math.round(gg / step) * step)
     bb = Math.round(Math.round(bb / step) * step)
   }
 
   // Add invert effect
-  if (adjustments.value.invert.enabled) {
-    const strength = adjustments.value.invert.strength / 100
+  if (adj.invert.enabled) {
+    const strength = adj.invert.strength / 100
     rr = rr * (1 - strength) + (255 - rr) * strength
     gg = gg * (1 - strength) + (255 - gg) * strength
     bb = bb * (1 - strength) + (255 - bb) * strength
   }
 
   // Apply colorize
-  if (adjustments.value.colorize.enabled) {
-    const tintColor = hexToRgb(adjustments.value.colorize.color)
+  if (adj.colorize.enabled) {
+    const tintColor = hexToRgb(adj.colorize.color)
     const luminance = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255
     const colorizeStrength = luminance < 0.02 ? 0 : 1
-    const intensity = (adjustments.value.colorize.intensity / 100) * colorizeStrength
+    const intensity = (adj.colorize.intensity / 100) * colorizeStrength
     const [r2, g2, b2] = blendColors([rr, gg, bb], tintColor, intensity * 100)
     rr = r2
     gg = g2
@@ -756,7 +785,13 @@ const processPixel = (r, g, b) => {
 
 const processVideoFrame = (imageData) => {
   const data = imageData.data
-  for (let i = 0; i < data.length; i += 4) {
+  const len = data.length
+
+  // Create local references to avoid property lookups
+  const adjustmentsEnabled = Object.values(adjustments.value).some(adj => adj.enabled)
+  if (!adjustmentsEnabled) return
+
+  for (let i = 0; i < len; i += 4) {
     const [r, g, b] = processPixel(data[i], data[i + 1], data[i + 2])
     data[i] = r
     data[i + 1] = g
