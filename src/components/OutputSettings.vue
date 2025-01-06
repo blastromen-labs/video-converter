@@ -101,6 +101,12 @@ const randomizeSettings = () => {
             ...props.adjustments.invert,
             enabled: randomBool(),
             strength: randomInt(0, 100)
+        },
+        colorSwap: {
+            enabled: randomBool(),
+            sourceColor: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
+            targetColor: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
+            tolerance: randomInt(0, 100)
         }
     }
 
@@ -235,6 +241,35 @@ const throttledEmit = throttle((type, value) => {
                                         ...adjustments,
                                         invert: { ...value, strength: parseInt($event.target.value) }
                                     })" min="0" max="100" class="adjustment-number" :disabled="!value.enabled">
+                                </template>
+                                <template v-else-if="key === 'colorSwap'">
+                                    <div class="color-swap-controls" :class="{ disabled: !value.enabled }">
+                                        <div class="color-picker-group">
+                                            <label>Source:</label>
+                                            <input type="color" :value="value.sourceColor" @input="emit('update:adjustments', {
+                                                ...adjustments,
+                                                colorSwap: { ...value, sourceColor: $event.target.value }
+                                            })" :disabled="!value.enabled" class="small-color-picker">
+                                        </div>
+                                        <div class="color-picker-group">
+                                            <label>Target:</label>
+                                            <input type="color" :value="value.targetColor" @input="emit('update:adjustments', {
+                                                ...adjustments,
+                                                colorSwap: { ...value, targetColor: $event.target.value }
+                                            })" :disabled="!value.enabled" class="small-color-picker">
+                                        </div>
+                                        <div class="tolerance-control">
+                                            <label>Tolerance:</label>
+                                            <input type="range" :value="value.tolerance" @input="emit('update:adjustments', {
+                                                ...adjustments,
+                                                colorSwap: { ...value, tolerance: parseInt($event.target.value) }
+                                            })" min="0" max="100" :disabled="!value.enabled">
+                                            <input type="number" :value="value.tolerance" @input="emit('update:adjustments', {
+                                                ...adjustments,
+                                                colorSwap: { ...value, tolerance: parseInt($event.target.value) }
+                                            })" min="0" max="100" class="adjustment-number" :disabled="!value.enabled">
+                                        </div>
+                                    </div>
                                 </template>
                             </div>
                             <button class="reset-icon-btn" @click="emit('update:adjustments', {
@@ -522,5 +557,29 @@ input[type="color"] {
     background: #2a2a2a;
     border-radius: 4px;
     padding: 6px 8px;
+}
+
+.color-swap-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.color-picker-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tolerance-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.tolerance-control input[type="range"] {
+    flex: 1;
 }
 </style>
