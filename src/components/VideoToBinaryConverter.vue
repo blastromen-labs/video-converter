@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import VideoPreview from './VideoPreview.vue'
 import TrimVideo from './TrimVideo.vue'
 import OutputSettings from './OutputSettings.vue'
+import ColorAnalyzer from './ColorAnalyzer.vue'
 
 const dropZone = ref(null)
 const fileInput = ref(null)
@@ -78,6 +79,12 @@ const adjustments = ref({
   invert: {
     enabled: false,
     strength: 100
+  },
+  colorSwap: {
+    enabled: false,
+    sourceColor: '#0000ff',
+    targetColor: '#000000',
+    tolerance: 50
   }
 })
 
@@ -594,6 +601,12 @@ const DEFAULT_SETTINGS = {
     invert: {
       enabled: false,
       strength: 100
+    },
+    colorSwap: {
+      enabled: false,
+      sourceColor: '#0000ff',
+      targetColor: '#000000',
+      tolerance: 50
     }
   },
   trim: {
@@ -657,16 +670,9 @@ const hexToRgb = (hex) => {
 // Update the image processing in updatePreview and resizeVideo
 const processPixel = (r, g, b) => {
   let rr = r, gg = g, bb = b
-
-  // Cache adjustments to avoid repeated property lookups
   const adj = adjustments.value
 
-  // Skip processing if no adjustments are enabled
-  if (!Object.values(adj).some(a => a.enabled)) {
-    return [rr, gg, bb]
-  }
-
-  // Apply RGB level adjustments first
+  // 1. RGB level adjustments
   if (adj.redLevel.enabled) {
     const factor = adj.redLevel.value / 128
     rr = Math.min(255, rr * factor)
@@ -680,49 +686,21 @@ const processPixel = (r, g, b) => {
     bb = Math.min(255, bb * factor)
   }
 
-  // Apply color reduction first if enabled and level is 1
-  if (adj.colorReduce.enabled && adj.colorReduce.levels === 1) {
-    const luminance = Math.round(rr * 0.299 + gg * 0.587 + bb * 0.114)
-    return [luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0, luminance >= 128 ? 255 : 0]
-  }
-
-  // Convert RGB to HSL and apply adjustments
-  const [h, s, l] = rgbToHsl(rr, gg, bb)
-  let newH = h
-  let newS = s
-
-  // Apply hue adjustment
-  if (adj.hue.enabled) {
-    newH = h + (adj.hue.value - 128) * 1.4
-    newH = (newH + 360) % 360
-  }
-
-  // Apply saturation adjustment
-  if (adj.saturation.enabled) {
-    newS = s * (adj.saturation.value / 128)
-    newS = Math.max(0, Math.min(100, newS))
-  }
-
-  // Convert back to RGB
-  const [r1, g1, b1] = hslToRgb(newH, newS, l)
-  rr = r1
-  gg = g1
-  bb = b1
-
-  // Apply basic adjustments
+  // 2. Brightness
   if (adj.brightness.enabled) {
     rr += (adj.brightness.value - 128)
     gg += (adj.brightness.value - 128)
     bb += (adj.brightness.value - 128)
   }
 
+  // 3. Contrast
   if (adj.contrast.enabled) {
     rr = ((rr - 128) * (adj.contrast.value / 128)) + 128
     gg = ((gg - 128) * (adj.contrast.value / 128)) + 128
     bb = ((bb - 128) * (adj.contrast.value / 128)) + 128
   }
 
-  // Apply tone adjustments
+  // 4. Highlights
   if (adj.highlights.enabled && rr > 128) {
     rr += (adj.highlights.value - 128) * ((rr - 128) / 128)
   }
@@ -733,6 +711,7 @@ const processPixel = (r, g, b) => {
     bb += (adj.highlights.value - 128) * ((bb - 128) / 128)
   }
 
+  // 5. Shadows
   if (adj.shadows.enabled && rr < 128) {
     rr += (adj.shadows.value - 128) * ((128 - rr) / 128)
   }
@@ -743,6 +722,7 @@ const processPixel = (r, g, b) => {
     bb += (adj.shadows.value - 128) * ((128 - bb) / 128)
   }
 
+  // 6. Midtones
   if (adj.midtones.enabled) {
     const midtoneFactor = 1 - Math.abs(rr - 128) / 128
     rr += (adj.midtones.value - 128) * midtoneFactor
@@ -752,15 +732,15 @@ const processPixel = (r, g, b) => {
     bb += (adj.midtones.value - 128) * midtoneFactorB
   }
 
-  // Apply color reduction for levels > 1
-  if (adj.colorReduce.enabled && adj.colorReduce.levels > 1) {
+  // 7. Color reduction
+  if (adj.colorReduce.enabled) {
     const step = 256 / (adj.colorReduce.levels - 1)
     rr = Math.round(Math.round(rr / step) * step)
     gg = Math.round(Math.round(gg / step) * step)
     bb = Math.round(Math.round(bb / step) * step)
   }
 
-  // Add invert effect
+  // 8. Invert
   if (adj.invert.enabled) {
     const strength = adj.invert.strength / 100
     rr = rr * (1 - strength) + (255 - rr) * strength
@@ -768,7 +748,7 @@ const processPixel = (r, g, b) => {
     bb = bb * (1 - strength) + (255 - bb) * strength
   }
 
-  // Apply colorize
+  // 9. Colorize
   if (adj.colorize.enabled) {
     const tintColor = hexToRgb(adj.colorize.color)
     const luminance = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255
@@ -778,6 +758,28 @@ const processPixel = (r, g, b) => {
     rr = r2
     gg = g2
     bb = b2
+  }
+
+  // 10. Color swap
+  if (adj.colorSwap.enabled) {
+    const sourceRGB = hexToRgb(adj.colorSwap.sourceColor)
+    const targetRGB = hexToRgb(adj.colorSwap.targetColor)
+
+    // Calculate color distance (simple Euclidean distance)
+    const distance = Math.sqrt(
+      Math.pow(rr - sourceRGB[0], 2) +
+      Math.pow(gg - sourceRGB[1], 2) +
+      Math.pow(bb - sourceRGB[2], 2)
+    )
+
+    // If color is within tolerance, swap it
+    const maxDistance = (adj.colorSwap.tolerance / 100) * 441.67 // sqrt(255^2 * 3)
+    if (distance <= maxDistance) {
+      const blendFactor = 1 - (distance / maxDistance)
+      rr = rr * (1 - blendFactor) + targetRGB[0] * blendFactor
+      gg = gg * (1 - blendFactor) + targetRGB[1] * blendFactor
+      bb = bb * (1 - blendFactor) + targetRGB[2] * blendFactor
+    }
   }
 
   return [rr, gg, bb]
@@ -891,7 +893,9 @@ const cancelConversion = () => {
 
     <div class="preview-section" @drop="handleDrop" @dragover="preventDefault" @dragenter="preventDefault">
       <div class="preview-header">
-        <h4>Video Preview</h4>
+        <div class="preview-title">
+          <ColorAnalyzer />
+        </div>
         <div class="preview-actions">
           <div v-if="isConverting" class="converting-status">
             <span>Converting...</span>
@@ -933,3 +937,11 @@ const cancelConversion = () => {
     </div>
   </div>
 </template>
+
+<style>
+.preview-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+</style>

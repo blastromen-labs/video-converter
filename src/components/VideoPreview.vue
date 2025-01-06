@@ -174,10 +174,11 @@ watch(() => props.videoUrl, () => {
         <div class="preview-box">
             <h5>Conversion</h5>
             <div class="preview-container">
-                <canvas ref="canvasRef" :width="previewWidth" :height="previewHeight" class="preview-canvas" :style="{
-                    width: displaySize.width + 'px',
-                    height: displaySize.height + 'px'
-                }">
+                <canvas ref="canvasRef" :width="previewWidth" :height="previewHeight"
+                    class="preview-canvas processed-preview" :style="{
+                        width: displaySize.width + 'px',
+                        height: displaySize.height + 'px'
+                    }">
                 </canvas>
             </div>
             <div v-if="metadata" class="video-info">
