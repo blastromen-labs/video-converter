@@ -975,16 +975,15 @@ const processPixel = (r, g, b) => {
       </div>
     </div>
 
-    <div class="preview-section">
+    <div
+      class="preview-section"
+      @drop="handleDrop"
+      @dragover="preventDefault"
+      @dragenter="preventDefault"
+    >
       <div class="preview-header">
         <h4>Video Preview</h4>
-        <div
-          class="preview-actions drop-zone"
-          ref="dropZone"
-          @drop="handleDrop"
-          @dragover="preventDefault"
-          @dragenter="preventDefault"
-        >
+        <div class="preview-actions">
           <span v-if="isConverting" class="converting-status">Converting...</span>
           <div v-if="convertedFile && !isConverting" class="button-group">
             <a :href="convertedFile" :download="fileName" class="download-btn">
@@ -1016,7 +1015,6 @@ const processPixel = (r, g, b) => {
         </div>
       </div>
 
-      <!-- Add file input here, outside of the buttons but still in the preview section -->
       <input
         ref="fileInput"
         type="file"
@@ -1075,30 +1073,47 @@ const processPixel = (r, g, b) => {
 
 <style scoped>
 .drop-zone {
-  border: 2px dashed #333;
-  border-radius: 4px;
-  padding: 4px 8px;
+  display: none;
+}
+
+.preview-section {
+  position: sticky;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: fit-content;
+  background: #1a1a1a;
+  padding: 20px;
+  border-radius: 8px;
   transition: all 0.2s;
 }
 
-.drop-zone:hover {
+.preview-section:hover {
   border-color: #42b883;
-  background: rgba(66, 184, 131, 0.1);
+  background: rgba(26, 26, 26, 0.95);
+  box-shadow: 0 0 0 2px rgba(66, 184, 131, 0.3);
 }
 
-.drop-message, .select-btn {
-  display: none;
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
 }
 
-.converting {
-  display: none;
+.preview-actions .button-group {
+  display: flex;
+  gap: 8px;
 }
 
-.download-btn, .reset-btn {
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
+.preview-actions .button-group > * {
+  padding: 4px 12px;
+  font-size: 0.8em;
+  border-radius: 3px;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 80px;
 }
 
 .download-btn {
@@ -1108,12 +1123,13 @@ const processPixel = (r, g, b) => {
 }
 
 .reset-btn {
-  background-color: #666;
+  background-color: #333;
   color: white;
   border: none;
 }
 
-.download-btn:hover, .reset-btn:hover {
+.download-btn:hover,
+.reset-btn:hover {
   opacity: 0.9;
 }
 
@@ -1155,18 +1171,6 @@ const processPixel = (r, g, b) => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.preview-section {
-  position: sticky;
-  top: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  height: fit-content;
-  background: #1a1a1a;
-  padding: 20px;
-  border-radius: 8px;
 }
 
 .preview-section h4 {
