@@ -31,7 +31,7 @@ onMounted(() => {
 
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.preset-dropdown')) {
+        if (!e.target.closest('.preset-manager')) {
             showDropdown.value = false
         }
     })
@@ -44,7 +44,6 @@ const saveNewPreset = () => {
     }
 
     const newPreset = {
-        id: Date.now(),
         name: newPresetName.value.trim(),
         settings: { ...props.currentSettings }
     }
@@ -62,20 +61,21 @@ const saveCurrentPreset = () => {
         return
     }
 
-    const index = presets.value.findIndex(p => p.id === selectedPreset.value.id)
+    const index = presets.value.findIndex(p => p.name === selectedPreset.value.name)
     if (index !== -1) {
         presets.value[index] = {
             ...selectedPreset.value,
             settings: { ...props.currentSettings }
         }
         saveToCookie()
+        showDropdown.value = false
     }
 }
 
-const deletePreset = (presetId, event) => {
+const deletePreset = (preset, event) => {
     event.stopPropagation() // Prevent dropdown from closing
-    presets.value = presets.value.filter(p => p.id !== presetId)
-    if (selectedPreset.value?.id === presetId) {
+    presets.value = presets.value.filter(p => p.name !== preset.name)
+    if (selectedPreset.value?.name === preset.name) {
         selectedPreset.value = null
     }
     saveToCookie()
@@ -85,6 +85,10 @@ const loadPreset = (preset) => {
     selectedPreset.value = preset
     emit('load-preset', preset.settings)
     showDropdown.value = false
+}
+
+const selectPreset = (preset) => {
+    selectedPreset.value = preset
 }
 
 const saveToCookie = () => {
@@ -104,252 +108,71 @@ const toggleDropdown = (event) => {
 </script>
 
 <template>
-    <div class="preset-manager">
-        <div class="preset-actions">
-            <div class="preset-dropdown" @click.stop>
-                <button class="dropdown-toggle" @click="toggleDropdown">
-                    {{ selectedPreset?.name || 'Select Preset' }}
-                    <span class="dropdown-arrow" :class="{ 'arrow-up': showDropdown }">▼</span>
+    <div class="relative preset-manager">
+        <button class="btn flex items-center gap-2" @click.stop="showDropdown = !showDropdown">
+            <span>{{ selectedPreset ? selectedPreset.name : 'Presets' }}</span>
+            <span class="text-xs">▼</span>
+        </button>
+
+        <div v-if="showDropdown"
+            class="absolute top-full mt-1 right-0 w-64 bg-panel-bg border border-border/20 rounded-lg shadow-lg overflow-hidden">
+            <div v-if="selectedPreset" class="p-3 border-b border-border/20 flex items-center justify-between">
+                <span class="text-sm text-text-secondary">Selected: {{ selectedPreset.name }}</span>
+                <button class="px-2 py-1 text-xs bg-accent text-white rounded hover:bg-accent/80"
+                    @click.stop="saveCurrentPreset" title="Save current settings to selected preset">
+                    Update
                 </button>
-                <div v-if="showDropdown" class="dropdown-menu">
-                    <div v-if="presets.length === 0" class="no-presets">
-                        No saved presets
-                    </div>
-                    <div v-else v-for="preset in presets" :key="preset.id" class="preset-item"
-                        @click="loadPreset(preset)" :class="{ 'selected': selectedPreset?.id === preset.id }">
-                        <span class="preset-name">{{ preset.name }}</span>
-                        <button class="delete-btn" @click="deletePreset(preset.id, $event)">
-                            ×
-                        </button>
+            </div>
+
+            <div v-if="showPresetInput" class="p-3 border-b border-border/20">
+                <div class="flex gap-2">
+                    <input type="text" v-model="newPresetName" placeholder="Preset name"
+                        class="flex-1 bg-control-bg border border-border rounded px-2 py-1 text-sm text-text"
+                        @keyup.enter="saveNewPreset" @keyup.esc="showPresetInput = false">
+                    <button
+                        class="w-6 h-6 flex items-center justify-center text-accent hover:text-accent/80 transition-colors"
+                        @click.stop="saveNewPreset" title="Save preset">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                    </button>
+                    <button
+                        class="w-6 h-6 flex items-center justify-center text-text-secondary hover:text-text transition-colors"
+                        @click.stop="showPresetInput = false" title="Cancel">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="max-h-64 overflow-y-auto">
+                <div v-if="presets.length === 0" class="p-4 text-text-secondary text-sm text-center italic">
+                    No presets saved
+                </div>
+                <div v-else v-for="preset in presets" :key="preset.name"
+                    class="flex items-center justify-between p-3 hover:bg-control-bg/50 transition-colors"
+                    :class="{ 'bg-accent/20 hover:bg-accent/30': preset === selectedPreset }"
+                    @click="selectPreset(preset)">
+                    <span>{{ preset.name }}</span>
+                    <div class="flex items-center gap-2">
+                        <button class="px-2 py-1 text-xs bg-accent text-white rounded hover:bg-accent/80"
+                            @click.stop="loadPreset(preset)">Load</button>
+                        <button class="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-500/80"
+                            @click.stop="deletePreset(preset, $event)">Delete</button>
                     </div>
                 </div>
             </div>
-            <button class="save-btn" :disabled="!selectedPreset"
-                :title="!selectedPreset ? 'Select a preset first' : 'Save current settings to selected preset'"
-                @click="saveCurrentPreset">
-                Save
-            </button>
-            <button class="save-new-btn" @click="showPresetInput = true">
-                Save New
-            </button>
-        </div>
 
-        <div v-if="showPresetInput" class="preset-input">
-            <input type="text" v-model="newPresetName" placeholder="Enter preset name" @keyup.enter="saveNewPreset">
-            <div class="preset-input-actions">
-                <button class="save-btn" @click="saveNewPreset">Save</button>
-                <button class="cancel-btn" @click="showPresetInput = false">Cancel</button>
+            <div class="p-3 border-t border-border/20">
+                <button v-if="!showPresetInput"
+                    class="w-full px-3 py-1.5 bg-accent text-white rounded hover:bg-accent/80"
+                    @click.stop="showPresetInput = true">Save New Preset</button>
             </div>
         </div>
     </div>
 </template>
 
 <style>
-.preset-manager {
-    display: flex;
-    align-items: center;
-}
-
-.preset-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.preset-dropdown {
-    position: relative;
-}
-
-.dropdown-toggle {
-    background: #2a2a2a;
-    color: white;
-    border: 1px solid #333;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-    min-width: 150px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.dropdown-arrow {
-    font-size: 0.8em;
-    transition: transform 0.2s;
-}
-
-.arrow-up {
-    transform: rotate(180deg);
-}
-
-.dropdown-menu {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    margin-top: 4px;
-    background: #2a2a2a;
-    border: 1px solid #333;
-    border-radius: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 1000;
-}
-
-.dropdown-menu .preset-item {
-    padding: 8px 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.dropdown-menu .preset-item:hover {
-    background: #333;
-}
-
-.dropdown-menu .preset-name {
-    color: white;
-    flex-grow: 1;
-}
-
-.dropdown-menu .delete-btn {
-    background: none;
-    border: none;
-    color: #ff4444;
-    font-size: 1.2em;
-    padding: 0 4px;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.dropdown-menu .preset-item:hover .delete-btn {
-    opacity: 1;
-}
-
-.save-preset-btn {
-    background: #42b883;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-}
-
-.preset-input {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 15px;
-}
-
-.preset-input input {
-    padding: 8px;
-    border: 1px solid #333;
-    border-radius: 4px;
-    background: #2a2a2a;
-    color: white;
-}
-
-.preset-input-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.save-btn {
-    background: #666;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-}
-
-.save-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.save-btn:not(:disabled):hover {
-    background: #777;
-}
-
-.save-new-btn {
-    background: #42b883;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-}
-
-.save-new-btn:hover {
-    background: #3aa876;
-}
-
-.cancel-btn {
-    background: #666;
-    color: white;
-}
-
-.presets-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.preset-item {
-    background: #2a2a2a;
-    padding: 10px;
-    border-radius: 4px;
-}
-
-.preset-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.preset-name {
-    color: #fff;
-}
-
-.preset-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.load-btn {
-    background: #42b883;
-    color: white;
-    padding: 4px 8px;
-    font-size: 0.8em;
-}
-
-.delete-btn {
-    background: #ff4444;
-    color: white;
-    padding: 4px 8px;
-    font-size: 0.8em;
-}
-
-.no-presets {
-    color: #666;
-    text-align: center;
-    font-style: italic;
-    padding: 20px;
-}
-
-.dropdown-menu .preset-item.selected {
-    background: #42b88333;
-}
-
-.dropdown-menu .preset-item.selected:hover {
-    background: #42b88355;
-}
+/* Remove all custom styles */
 </style>

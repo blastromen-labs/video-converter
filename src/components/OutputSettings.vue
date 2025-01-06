@@ -66,7 +66,7 @@ const resetValue = (control) => {
                 <div class="space-y-4">
                     <div v-for="control in section.controls" :key="control.key" class="flex items-center gap-3">
                         <input type="checkbox" v-model="adjustments[control.key].enabled"
-                            class="form-checkbox h-4 w-4 bg-control-bg border-border rounded text-accent focus:ring-accent focus:ring-offset-0">
+                            class="form-checkbox h-4 w-4 bg-control-bg border-border rounded text-accent focus:ring-accent focus:ring-offset-0 focus:ring-offset-panel-bg checked:bg-accent checked:border-accent">
                         <label class="text-sm text-text min-w-[120px]">{{ control.label }}</label>
 
                         <!-- Standard slider -->

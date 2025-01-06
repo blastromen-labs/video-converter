@@ -117,14 +117,17 @@ const randomizeSettings = () => {
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-4">
                     <PresetManager :current-settings="currentSettings" @load-preset="handleLoadPreset" />
-                    <button class="btn hover:bg-control-bg/80" @click="randomizeSettings" title="Randomize settings">
-                        <span class="text-lg">🎲</span>
-                    </button>
-                    <button class="btn hover:bg-control-bg/80" @click="resetSettings" title="Reset all settings">
-                        <span class="text-lg">↺</span>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button class="btn hover:bg-control-bg/80" @click="randomizeSettings"
+                            title="Randomize settings">
+                            <span class="text-lg">🎲</span>
+                        </button>
+                        <button class="btn hover:bg-control-bg/80" @click="resetSettings" title="Reset all settings">
+                            <span class="text-lg">↺</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
