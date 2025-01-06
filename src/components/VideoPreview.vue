@@ -144,12 +144,12 @@ watch(() => props.videoUrl, () => {
 </script>
 
 <template>
-    <div class="preview-row">
+    <div class="preview-row h-[calc(100vh-200px)] min-h-[800px]">
         <div class="preview-box">
             <h5>Original</h5>
-            <div class="preview-container">
-                <video ref="videoRef" :src="videoUrl" controls preload="auto" crossorigin="anonymous"
-                    playsinline></video>
+            <div class="preview-container w-[400px] h-[calc(100%-100px)]">
+                <video ref="videoRef" :src="videoUrl" controls preload="auto" crossorigin="anonymous" playsinline
+                    class="max-w-full max-h-full object-contain"></video>
             </div>
             <div v-if="metadata" class="video-info">
                 <div class="info-row">
@@ -173,11 +173,12 @@ watch(() => props.videoUrl, () => {
 
         <div class="preview-box">
             <h5>Conversion</h5>
-            <div class="preview-container">
+            <div class="preview-container w-[400px] h-[calc(100%-100px)]">
                 <canvas ref="canvasRef" :width="previewWidth" :height="previewHeight"
                     class="preview-canvas processed-preview" :style="{
-                        width: displaySize.width + 'px',
-                        height: displaySize.height + 'px'
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain'
                     }">
                 </canvas>
             </div>
@@ -206,14 +207,17 @@ watch(() => props.videoUrl, () => {
 <style>
 .preview-row {
     display: flex;
-    gap: 20px;
+    gap: 40px;
     justify-content: center;
+    padding: 20px 0;
 }
 
 .preview-box {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 400px;
+    height: 100%;
 }
 
 .preview-box h5 {
@@ -224,11 +228,17 @@ watch(() => props.videoUrl, () => {
 .preview-container {
     border-radius: 4px;
     overflow: hidden;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 20px;
 }
 
 .preview-container video,
 .preview-container canvas {
     display: block;
+    object-fit: contain;
 }
 
 .video-info {
@@ -262,6 +272,7 @@ watch(() => props.videoUrl, () => {
 
 .preview-canvas {
     image-rendering: pixelated;
-    /* Makes scaled-up pixels sharp */
+    width: 100%;
+    height: 100%;
 }
 </style>

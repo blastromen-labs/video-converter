@@ -4,6 +4,7 @@ import VideoPreview from './VideoPreview.vue'
 import TrimVideo from './TrimVideo.vue'
 import OutputSettings from './OutputSettings.vue'
 import ColorAnalyzer from './ColorAnalyzer.vue'
+import Navbar from './Navbar.vue'
 
 const dropZone = ref(null)
 const fileInput = ref(null)
@@ -875,64 +876,69 @@ const cancelConversion = () => {
 }
 </script>
 <template>
-  <div class="converter-container">
-    <div class="main-content">
-      <OutputSettings v-model:target-resolution="targetResolution" v-model:adjustments="adjustments"
-        v-model:trim-settings="trimSettings" :default-settings="DEFAULT_SETTINGS" :video-metadata="videoMetadata" />
+  <div class="min-h-screen bg-app-bg">
+    <Navbar v-model:target-resolution="targetResolution" v-model:adjustments="adjustments"
+      v-model:trim-settings="trimSettings" :default-settings="DEFAULT_SETTINGS" :video-metadata="videoMetadata" />
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="grid grid-cols-1 lg:grid-cols-[450px,1fr] gap-6">
+        <OutputSettings v-model:adjustments="adjustments" v-model:trim-settings="trimSettings"
+          :video-metadata="videoMetadata" :default-settings="DEFAULT_SETTINGS" />
 
-      <div v-if="videoMetadata" class="metadata">
-        <h3>Video Information:</h3>
-        <p>Original Resolution: {{ videoMetadata.width }}x{{ videoMetadata.height }}</p>
-        <p>Original Aspect Ratio: {{ videoMetadata.sourceAspectRatio }}</p>
-        <p>Target Resolution: {{ targetResolution.width }}x{{ targetResolution.height }}</p>
-        <p>Target Aspect Ratio: {{ videoMetadata.targetAspectRatio }}</p>
-        <p>Duration: {{ videoMetadata.duration }}s</p>
-        <p>Original FPS: {{ videoMetadata.fps }}</p>
-      </div>
-    </div>
-
-    <div class="preview-section" @drop="handleDrop" @dragover="preventDefault" @dragenter="preventDefault">
-      <div class="preview-header">
-        <div class="preview-title">
-          <ColorAnalyzer />
-        </div>
-        <div class="preview-actions">
-          <div v-if="isConverting" class="converting-status">
-            <span>Converting...</span>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: conversionProgress + '%' }"></div>
+        <div class="flex flex-col gap-6">
+          <!-- Preview Section -->
+          <div class="bg-panel-bg rounded-lg shadow-lg overflow-hidden" @drop="handleDrop" @dragover="preventDefault"
+            @dragenter="preventDefault">
+            <div class="p-4 border-b border-border/20">
+              <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                  <ColorAnalyzer />
+                </div>
+                <div class="flex items-center gap-3">
+                  <div v-if="isConverting" class="flex items-center gap-3">
+                    <span class="text-text-secondary">Converting...</span>
+                    <div class="w-32 h-2 bg-control-bg rounded-full overflow-hidden">
+                      <div class="h-full bg-accent transition-all duration-200"
+                        :style="{ width: conversionProgress + '%' }"></div>
+                    </div>
+                    <button class="btn" @click="cancelConversion">Cancel</button>
+                  </div>
+                  <div v-else-if="previewUrl" class="flex items-center gap-3">
+                    <button v-if="!convertedFile || settingsChanged" class="btn" @click="convertVideo(selectedFile)">
+                      {{ convertedFile ? 'Reconvert' : 'Convert' }}
+                    </button>
+                    <a v-if="convertedFile && !settingsChanged" :href="convertedFile" :download="fileName"
+                      class="btn bg-accent hover:bg-accent/80 text-text">
+                      Download .bin
+                    </a>
+                    <button class="btn" @click="handleNewFile">New file</button>
+                  </div>
+                  <div v-else class="flex items-center gap-3">
+                    <button class="btn" @click="handleNewFile">
+                      Select video file
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <button class="cancel-btn" @click="cancelConversion">
-              Cancel
-            </button>
-          </div>
-          <div v-else-if="previewUrl" class="button-group">
-            <button v-if="!convertedFile || settingsChanged" class="convert-btn" @click="convertVideo(selectedFile)">
-              {{ convertedFile ? 'Reconvert' : 'Convert' }}
-            </button>
-            <a v-if="convertedFile && !settingsChanged" :href="convertedFile" :download="fileName" class="download-btn">
-              Download .bin
-            </a>
-            <button class="reset-btn" @click="handleNewFile">
-              New file
-            </button>
-          </div>
-          <div v-else class="button-group">
-            <button class="reset-btn" @click="handleNewFile">
-              Select video file
-            </button>
+
+            <input ref="fileInput" type="file" accept="video/mp4,video/quicktime" class="hidden"
+              @change="handleFileSelect">
+
+            <div class="relative aspect-video bg-black/20">
+              <VideoPreview v-if="previewUrl" :video-url="previewUrl" :metadata="videoMetadata"
+                :preview-width="targetResolution.width" :preview-height="targetResolution.height"
+                :process-frame="processVideoFrame" :trim-settings="trimSettings" @video-loaded="handleVideoLoaded"
+                class="w-full h-full" />
+              <div v-else class="absolute inset-0 flex items-center justify-center">
+                <div class="text-center">
+                  <p class="text-text-secondary mb-4">Drag & drop video file here</p>
+                  <p class="text-text-secondary text-sm">or</p>
+                  <button class="btn mt-4" @click="handleNewFile">Select video file</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-      <input ref="fileInput" type="file" accept="video/mp4,video/quicktime" class="hidden" @change="handleFileSelect">
-
-      <VideoPreview v-if="previewUrl" :video-url="previewUrl" :metadata="videoMetadata"
-        :preview-width="targetResolution.width" :preview-height="targetResolution.height"
-        :process-frame="processVideoFrame" :trim-settings="trimSettings" @video-loaded="handleVideoLoaded" />
-
-      <div v-else class="preview-placeholder">
-        <p>Drag & drop video file here or use the button above</p>
       </div>
     </div>
   </div>
