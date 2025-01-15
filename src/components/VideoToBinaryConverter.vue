@@ -815,6 +815,8 @@ const cancelConversion = () => {
     abortController.value = null
   }
 }
+
+const isPlaying = ref(false)
 </script>
 <template>
   <div class="min-h-screen bg-app-bg">
@@ -833,6 +835,15 @@ const cancelConversion = () => {
               <div class="flex justify-between items-center">
                 <div class="flex items-center gap-3">
                   <ColorAnalyzer />
+                  <button v-if="videoMetadata" class="btn hover:bg-control-bg/80 flex items-center gap-2"
+                    @click="$refs.videoPreview?.togglePlay()" :title="isPlaying ? 'Pause' : 'Play'">
+                    <svg v-if="!isPlaying" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    <svg v-else class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                    </svg>
+                  </button>
                 </div>
                 <div class="flex items-center gap-3">
                   <div v-if="isConverting" class="flex items-center gap-3">
@@ -866,10 +877,10 @@ const cancelConversion = () => {
               @change="handleFileSelect">
 
             <div class="relative aspect-video bg-black/20">
-              <VideoPreview v-if="previewUrl" :video-url="previewUrl" :metadata="videoMetadata"
+              <VideoPreview ref="videoPreview" v-if="previewUrl" :video-url="previewUrl" :metadata="videoMetadata"
                 :preview-width="targetResolution.width" :preview-height="targetResolution.height"
-                :process-frame="processVideoFrame" :trim-settings="trimSettings" @video-loaded="handleVideoLoaded"
-                class="w-full h-full" />
+                :process-frame="processVideoFrame" :trim-settings="trimSettings" v-model:isPlaying="isPlaying"
+                @video-loaded="handleVideoLoaded" class="w-full h-full" />
               <div v-else class="absolute inset-0 flex items-center justify-center">
                 <div class="text-center">
                   <p class="text-text-secondary mb-4">Drag & drop video file here</p>
