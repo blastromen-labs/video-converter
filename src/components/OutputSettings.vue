@@ -3,13 +3,30 @@ import { ref } from 'vue'
 import TrimVideo from './TrimVideo.vue'
 
 const props = defineProps({
-    adjustments: Object,
+    adjustments: {
+        type: Object,
+        required: true
+    },
     trimSettings: Object,
     videoMetadata: Object,
-    defaultSettings: Object
+    defaultSettings: {
+        type: Object,
+        required: true,
+        validator(value) {
+            return value.resolution && value.adjustments
+        }
+    },
+    'target-resolution': {
+        type: Object,
+        required: true
+    }
 })
 
-const emit = defineEmits(['update:adjustments', 'update:trimSettings'])
+const emit = defineEmits([
+    'update:adjustments',
+    'update:trimSettings',
+    'update:target-resolution'
+])
 
 const sections = ref([
     {
@@ -49,15 +66,120 @@ const resetValue = (control) => {
         [control.key]: { ...props.defaultSettings.adjustments[control.key] }
     })
 }
+
+const randomizeSettings = () => {
+    const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min)
+    const randomBool = () => Math.random() > 0.5
+    const randomHex = () => '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
+
+    emit('update:adjustments', {
+        ...props.adjustments,
+        oneBit: {
+            enabled: randomBool(),
+            threshold: randomInt(0, 255),
+            darkColor: randomHex(),
+            lightColor: randomHex()
+        },
+        brightness: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        contrast: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        redLevel: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        greenLevel: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        blueLevel: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        highlights: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        shadows: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        midtones: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        hue: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        saturation: {
+            enabled: randomBool(),
+            value: randomInt(0, 255)
+        },
+        colorReduce: {
+            enabled: randomBool(),
+            levels: randomInt(2, 8)
+        },
+        invert: {
+            enabled: randomBool(),
+            strength: randomInt(0, 100)
+        },
+        colorize: {
+            enabled: randomBool(),
+            color: randomHex(),
+            intensity: randomInt(0, 100)
+        },
+        colorSwap: {
+            enabled: randomBool(),
+            sourceColor: randomHex(),
+            targetColor: randomHex(),
+            tolerance: randomInt(0, 100)
+        }
+    })
+}
+
+const resetSettings = () => {
+    // Reset target resolution
+    emit('update:target-resolution', {
+        width: props.defaultSettings.resolution.width,
+        height: props.defaultSettings.resolution.height,
+        fps: props.defaultSettings.resolution.fps
+    })
+
+    // Reset all adjustments
+    const defaultAdjustments = {}
+    Object.keys(props.adjustments).forEach(key => {
+        defaultAdjustments[key] = JSON.parse(JSON.stringify(props.defaultSettings.adjustments[key]))
+    })
+    emit('update:adjustments', defaultAdjustments)
+}
 </script>
 
 <template>
     <div class="bg-panel-bg rounded-lg shadow-lg overflow-hidden">
+        <!-- Settings Header -->
+        <div class="p-4 border-b border-border/20 flex justify-between items-center">
+            <h2 class="text-lg font-medium text-text">Settings</h2>
+            <div class="flex items-center gap-2">
+                <button class="btn hover:bg-control-bg/80" @click="randomizeSettings" title="Randomize settings">
+                    <span class="text-lg">🎲</span>
+                </button>
+                <button class="btn hover:bg-control-bg/80" @click="resetSettings" title="Reset settings to default">
+                    <span class="text-lg">↺</span>
+                </button>
+            </div>
+        </div>
+
         <!-- Trim Controls -->
         <div class="p-4 border-b border-border/20">
             <TrimVideo v-if="videoMetadata" v-model:enabled="trimSettings.enabled"
                 v-model:startTime="trimSettings.start" v-model:endTime="trimSettings.end"
-                :duration="videoMetadata.duration" />
+                :duration="videoMetadata.duration" v-model:resolution="props['target-resolution']"
+                :resolution="props['target-resolution']" />
         </div>
 
         <!-- Adjustment Controls -->

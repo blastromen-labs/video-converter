@@ -43,16 +43,16 @@ const saveNewPreset = () => {
         return
     }
 
-    const newPreset = {
-        name: newPresetName.value.trim(),
-        settings: { ...props.currentSettings }
+    const preset = {
+        name: newPresetName.value,
+        targetResolution: { ...props.currentSettings.targetResolution },
+        adjustments: { ...props.currentSettings.adjustments },
     }
 
-    presets.value.push(newPreset)
-    selectedPreset.value = newPreset
+    presets.value = [...presets.value, preset]
     saveToCookie()
-    newPresetName.value = ''
     showPresetInput.value = false
+    newPresetName.value = ''
 }
 
 const saveCurrentPreset = () => {

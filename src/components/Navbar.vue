@@ -15,9 +15,6 @@ const emit = defineEmits(['update:targetResolution', 'update:adjustments', 'upda
 const handleLoadPreset = (settings) => {
     emit('update:targetResolution', { ...settings.targetResolution })
     emit('update:adjustments', { ...settings.adjustments })
-    if (settings.trimSettings) {
-        emit('update:trimSettings', { ...settings.trimSettings })
-    }
 }
 
 const currentSettings = computed(() => ({
@@ -25,11 +22,6 @@ const currentSettings = computed(() => ({
     adjustments: props.adjustments,
     trimSettings: props.trimSettings
 }))
-
-const resetSettings = () => {
-    emit('update:targetResolution', { ...props.defaultSettings.resolution })
-    emit('update:adjustments', { ...props.defaultSettings.adjustments })
-}
 
 const randomizeSettings = () => {
     const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min)
@@ -104,37 +96,8 @@ const randomizeSettings = () => {
 <template>
     <nav class="sticky top-0 z-50 bg-panel-bg/95 backdrop-blur-sm border-b border-border/20 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center gap-6">
-                    <div class="flex items-center gap-2">
-                        <label class="text-text-secondary text-sm font-medium">Width:</label>
-                        <input type="number" :value="targetResolution.width" min="1" max="1000" class="input w-16"
-                            @input="$emit('update:targetResolution', { ...targetResolution, width: parseInt($event.target.value) })">
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label class="text-text-secondary text-sm font-medium">Height:</label>
-                        <input type="number" :value="targetResolution.height" min="1" max="1000" class="input w-16"
-                            @input="$emit('update:targetResolution', { ...targetResolution, height: parseInt($event.target.value) })">
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <label class="text-text-secondary text-sm font-medium">FPS:</label>
-                        <input type="number" :value="targetResolution.fps" min="1" max="60" class="input w-16"
-                            @input="$emit('update:targetResolution', { ...targetResolution, fps: parseInt($event.target.value) })">
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4">
-                    <PresetManager :current-settings="currentSettings" @load-preset="handleLoadPreset" />
-                    <div class="flex items-center gap-2">
-                        <button class="btn hover:bg-control-bg/80" @click="randomizeSettings"
-                            title="Randomize settings">
-                            <span class="text-lg">🎲</span>
-                        </button>
-                        <button class="btn hover:bg-control-bg/80" @click="resetSettings" title="Reset all settings">
-                            <span class="text-lg">↺</span>
-                        </button>
-                    </div>
-                </div>
+            <div class="flex justify-end items-center h-16">
+                <PresetManager :current-settings="currentSettings" @load-preset="handleLoadPreset" />
             </div>
         </div>
     </nav>

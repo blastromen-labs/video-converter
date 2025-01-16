@@ -210,7 +210,6 @@ const videoAttrs = computed(() => ({
     preload: 'auto',
     crossorigin: 'anonymous',
     playsinline: true,
-    class: 'max-w-full max-h-full object-contain',
     ...(props.trimSettings?.enabled ? {
         min: props.trimSettings.start,
         max: props.trimSettings.end
@@ -239,37 +238,10 @@ watch(() => props.videoUrl, () => {
 </script>
 
 <template>
-    <div class="preview-row h-[calc(100vh-200px)] min-h-[800px]">
-        <div class="preview-box">
-            <h5>Original</h5>
-            <div class="preview-container w-[400px] h-[calc(100%-100px)]">
-                <div class="relative w-full h-full">
-                    <video ref="videoRef" v-bind="videoAttrs"></video>
-                </div>
-            </div>
-            <div v-if="metadata" class="video-info">
-                <div class="info-row">
-                    <span>Resolution:</span>
-                    <span>{{ metadata.width }}x{{ metadata.height }}</span>
-                </div>
-                <div class="info-row">
-                    <span>Aspect Ratio:</span>
-                    <span>{{ metadata.sourceAspectRatio }}</span>
-                </div>
-                <div class="info-row">
-                    <span>Duration:</span>
-                    <span>{{ metadata.duration }}s</span>
-                </div>
-                <div class="info-row">
-                    <span>Original FPS:</span>
-                    <span>{{ metadata.fps }}</span>
-                </div>
-            </div>
-        </div>
-
+    <div class="flex flex-col lg:flex-row gap-8 lg:gap-10">
         <div class="preview-box">
             <h5>Conversion</h5>
-            <div class="preview-container w-[400px] h-[calc(100%-100px)]">
+            <div class="preview-container w-full lg:w-[400px] h-[250px] lg:h-[400px]">
                 <div class="relative w-full h-full">
                     <canvas ref="canvasRef" :width="previewWidth" :height="previewHeight"
                         class="preview-canvas processed-preview" :style="{
@@ -299,23 +271,42 @@ watch(() => props.videoUrl, () => {
                 </div>
             </div>
         </div>
+
+        <div class="preview-box">
+            <h5>Original</h5>
+            <div class="preview-container w-full lg:w-[400px] h-[250px] lg:h-[400px]">
+                <div class="w-full h-full flex items-center justify-center">
+                    <video ref="videoRef" v-bind="videoAttrs" class="max-w-full max-h-full object-contain"></video>
+                </div>
+            </div>
+            <div v-if="metadata" class="video-info">
+                <div class="info-row">
+                    <span>Resolution:</span>
+                    <span>{{ metadata.width }}x{{ metadata.height }}</span>
+                </div>
+                <div class="info-row">
+                    <span>Aspect Ratio:</span>
+                    <span>{{ metadata.sourceAspectRatio }}</span>
+                </div>
+                <div class="info-row">
+                    <span>Duration:</span>
+                    <span>{{ metadata.duration }}s</span>
+                </div>
+                <div class="info-row">
+                    <span>Original FPS:</span>
+                    <span>{{ metadata.fps }}</span>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <style>
-.preview-row {
-    display: flex;
-    gap: 40px;
-    justify-content: center;
-    padding: 20px 0;
-}
-
 .preview-box {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 400px;
-    height: 100%;
+    width: 100%;
 }
 
 .preview-box h5 {
@@ -336,7 +327,6 @@ watch(() => props.videoUrl, () => {
 .preview-container video,
 .preview-container canvas {
     display: block;
-    object-fit: contain;
 }
 
 .video-info {

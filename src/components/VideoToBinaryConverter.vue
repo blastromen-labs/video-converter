@@ -596,25 +596,10 @@ const hexToRgb = (hex) => {
 
 // Update the image processing in updatePreview and resizeVideo
 const processPixel = (r, g, b) => {
-  let rr = r, gg = g, bb = b
   const adj = adjustments.value
+  let [rr, gg, bb] = [r, g, b]
 
-  // 1-Bit conversion (should be applied before other effects)
-  if (adj.oneBit.enabled) {
-    // Calculate luminance
-    const luminance = (rr * 0.299 + gg * 0.587 + bb * 0.114)
-    // Apply threshold
-    const isWhite = luminance > adj.oneBit.threshold
-    const targetColor = isWhite ? adj.oneBit.lightColor : adj.oneBit.darkColor
-    const [tr, tg, tb] = hexToRgb(targetColor)
-    rr = tr
-    gg = tg
-    bb = tb
-    // Return early since we don't need other color adjustments
-    return [rr, gg, bb]
-  }
-
-  // 1. RGB level adjustments
+  // Color Adjustments (First)
   if (adj.redLevel.enabled) {
     const factor = adj.redLevel.value / 128
     rr = Math.min(255, rr * factor)
@@ -628,21 +613,22 @@ const processPixel = (r, g, b) => {
     bb = Math.min(255, bb * factor)
   }
 
-  // 2. Brightness
+  // Brightness
   if (adj.brightness.enabled) {
     rr += (adj.brightness.value - 128)
     gg += (adj.brightness.value - 128)
     bb += (adj.brightness.value - 128)
   }
 
-  // 3. Contrast
+  // Contrast
   if (adj.contrast.enabled) {
     rr = ((rr - 128) * (adj.contrast.value / 128)) + 128
     gg = ((gg - 128) * (adj.contrast.value / 128)) + 128
     bb = ((bb - 128) * (adj.contrast.value / 128)) + 128
   }
 
-  // 4. Highlights
+  // Tone Controls
+  // Highlights
   if (adj.highlights.enabled && rr > 128) {
     rr += (adj.highlights.value - 128) * ((rr - 128) / 128)
   }
@@ -653,7 +639,7 @@ const processPixel = (r, g, b) => {
     bb += (adj.highlights.value - 128) * ((bb - 128) / 128)
   }
 
-  // 5. Shadows
+  // Shadows
   if (adj.shadows.enabled && rr < 128) {
     rr += (adj.shadows.value - 128) * ((128 - rr) / 128)
   }
@@ -664,7 +650,7 @@ const processPixel = (r, g, b) => {
     bb += (adj.shadows.value - 128) * ((128 - bb) / 128)
   }
 
-  // 6. Midtones
+  // Midtones
   if (adj.midtones.enabled) {
     const midtoneFactor = 1 - Math.abs(rr - 128) / 128
     rr += (adj.midtones.value - 128) * midtoneFactor
@@ -674,15 +660,27 @@ const processPixel = (r, g, b) => {
     bb += (adj.midtones.value - 128) * midtoneFactorB
   }
 
-  // 7. Color reduction
+  // 1. One-Bit
+  if (adj.oneBit.enabled) {
+    const brightness = (rr * 0.299 + gg * 0.587 + bb * 0.114)
+    const isDark = brightness < adj.oneBit.threshold
+    const targetColor = isDark ? adj.oneBit.darkColor : adj.oneBit.lightColor
+    const [tr, tg, tb] = hexToRgb(targetColor)
+    rr = tr
+    gg = tg
+    bb = tb
+  }
+
+  // 2. Color Reduction
   if (adj.colorReduce.enabled) {
-    const step = 256 / (adj.colorReduce.levels - 1)
+    const levels = adj.colorReduce.levels
+    const step = 255 / (levels - 1)
     rr = Math.round(Math.round(rr / step) * step)
     gg = Math.round(Math.round(gg / step) * step)
     bb = Math.round(Math.round(bb / step) * step)
   }
 
-  // 8. Invert
+  // 3. Invert
   if (adj.invert.enabled) {
     const strength = adj.invert.strength / 100
     rr = rr * (1 - strength) + (255 - rr) * strength
@@ -690,32 +688,25 @@ const processPixel = (r, g, b) => {
     bb = bb * (1 - strength) + (255 - bb) * strength
   }
 
-  // 9. Colorize
+  // 4. Colorize
   if (adj.colorize.enabled) {
-    const tintColor = hexToRgb(adj.colorize.color)
-    const luminance = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255
-    const colorizeStrength = luminance < 0.02 ? 0 : 1
-    const intensity = (adj.colorize.intensity / 100) * colorizeStrength
-    const [r2, g2, b2] = blendColors([rr, gg, bb], tintColor, intensity * 100)
-    rr = r2
-    gg = g2
-    bb = b2
+    const targetRGB = hexToRgb(adj.colorize.color)
+    const intensity = adj.colorize.intensity / 100
+    rr = rr * (1 - intensity) + targetRGB[0] * intensity
+    gg = gg * (1 - intensity) + targetRGB[1] * intensity
+    bb = bb * (1 - intensity) + targetRGB[2] * intensity
   }
 
-  // 10. Color swap
+  // 5. Color Swap
   if (adj.colorSwap.enabled) {
     const sourceRGB = hexToRgb(adj.colorSwap.sourceColor)
     const targetRGB = hexToRgb(adj.colorSwap.targetColor)
-
-    // Calculate color distance (simple Euclidean distance)
     const distance = Math.sqrt(
       Math.pow(rr - sourceRGB[0], 2) +
       Math.pow(gg - sourceRGB[1], 2) +
       Math.pow(bb - sourceRGB[2], 2)
     )
-
-    // If color is within tolerance, swap it
-    const maxDistance = (adj.colorSwap.tolerance / 100) * 441.67 // sqrt(255^2 * 3)
+    const maxDistance = (adj.colorSwap.tolerance / 100) * 441.67
     if (distance <= maxDistance) {
       const blendFactor = 1 - (distance / maxDistance)
       rr = rr * (1 - blendFactor) + targetRGB[0] * blendFactor
@@ -821,11 +812,17 @@ const isPlaying = ref(false)
 <template>
   <div class="min-h-screen bg-app-bg">
     <Navbar v-model:target-resolution="targetResolution" v-model:adjustments="adjustments"
-      v-model:trim-settings="trimSettings" :default-settings="DEFAULT_SETTINGS" :video-metadata="videoMetadata" />
+      v-model:trim-settings="trimSettings" :default-settings="{
+        resolution: DEFAULT_SETTINGS.resolution,
+        adjustments: DEFAULT_SETTINGS.adjustments
+      }" :video-metadata="videoMetadata" />
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div class="grid grid-cols-1 lg:grid-cols-[450px,1fr] gap-6">
         <OutputSettings v-model:adjustments="adjustments" v-model:trim-settings="trimSettings"
-          :video-metadata="videoMetadata" :default-settings="DEFAULT_SETTINGS" />
+          v-model:target-resolution="targetResolution" :video-metadata="videoMetadata" :default-settings="{
+            resolution: DEFAULT_SETTINGS.resolution,
+            adjustments: DEFAULT_SETTINGS.adjustments
+          }" />
 
         <div class="flex flex-col gap-6">
           <!-- Preview Section -->
@@ -876,11 +873,11 @@ const isPlaying = ref(false)
             <input ref="fileInput" type="file" accept="video/mp4,video/quicktime" class="hidden"
               @change="handleFileSelect">
 
-            <div class="relative aspect-video bg-black/20">
+            <div class="relative bg-black/20 min-h-[600px] lg:min-h-[800px] p-6">
               <VideoPreview ref="videoPreview" v-if="previewUrl" :video-url="previewUrl" :metadata="videoMetadata"
                 :preview-width="targetResolution.width" :preview-height="targetResolution.height"
                 :process-frame="processVideoFrame" :trim-settings="trimSettings" v-model:isPlaying="isPlaying"
-                @video-loaded="handleVideoLoaded" class="w-full h-full" />
+                @video-loaded="handleVideoLoaded" class="w-full" />
               <div v-else class="absolute inset-0 flex items-center justify-center">
                 <div class="text-center">
                   <p class="text-text-secondary mb-4">Drag & drop video file here</p>
