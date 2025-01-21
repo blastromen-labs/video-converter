@@ -45,8 +45,10 @@ const saveNewPreset = () => {
 
     const preset = {
         name: newPresetName.value,
-        targetResolution: { ...props.currentSettings.targetResolution },
-        adjustments: { ...props.currentSettings.adjustments },
+        settings: {
+            targetResolution: { ...props.currentSettings.targetResolution },
+            adjustments: { ...props.currentSettings.adjustments }
+        }
     }
 
     presets.value = [...presets.value, preset]
@@ -64,8 +66,11 @@ const saveCurrentPreset = () => {
     const index = presets.value.findIndex(p => p.name === selectedPreset.value.name)
     if (index !== -1) {
         presets.value[index] = {
-            ...selectedPreset.value,
-            settings: { ...props.currentSettings }
+            name: selectedPreset.value.name,
+            settings: {
+                targetResolution: { ...props.currentSettings.targetResolution },
+                adjustments: { ...props.currentSettings.adjustments }
+            }
         }
         saveToCookie()
         showDropdown.value = false
