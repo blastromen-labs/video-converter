@@ -60,10 +60,12 @@ const sections = ref([
 ])
 
 const resetValue = (control) => {
-    if (!props.defaultSettings?.adjustments?.[control.key]) return
+    // Reset individual setting using defaultSettings
     emit('update:adjustments', {
         ...props.adjustments,
-        [control.key]: { ...props.defaultSettings.adjustments[control.key] }
+        [control.key]: {
+            ...props.defaultSettings.adjustments[control.key]
+        }
     })
 }
 
