@@ -5,7 +5,8 @@ const props = defineProps({
     currentSettings: {
         type: Object,
         required: true
-    }
+    },
+    defaultSettings: Object
 })
 
 const emit = defineEmits(['load-preset'])
@@ -109,6 +110,83 @@ const getCookie = (name) => {
 const toggleDropdown = (event) => {
     event.stopPropagation()
     showDropdown.value = !showDropdown.value
+}
+
+const handleReset = () => {
+    emit('load-preset', {
+        targetResolution: {
+            width: 40,
+            height: 96,
+            fps: 30
+        },
+        adjustments: {
+            oneBit: {
+                enabled: false,
+                threshold: 128,
+                darkColor: '#000000',
+                lightColor: '#ffffff'
+            },
+            brightness: {
+                enabled: false,
+                value: 128
+            },
+            contrast: {
+                enabled: false,
+                value: 128
+            },
+            redLevel: {
+                enabled: false,
+                value: 128
+            },
+            greenLevel: {
+                enabled: false,
+                value: 128
+            },
+            blueLevel: {
+                enabled: false,
+                value: 128
+            },
+            highlights: {
+                enabled: false,
+                value: 128
+            },
+            shadows: {
+                enabled: false,
+                value: 128
+            },
+            midtones: {
+                enabled: false,
+                value: 128
+            },
+            hue: {
+                enabled: false,
+                value: 128
+            },
+            saturation: {
+                enabled: false,
+                value: 128
+            },
+            colorize: {
+                enabled: false,
+                color: '#42b883',
+                intensity: 50
+            },
+            colorReduce: {
+                enabled: false,
+                levels: 2
+            },
+            invert: {
+                enabled: false,
+                strength: 100
+            },
+            colorSwap: {
+                enabled: false,
+                sourceColor: '#0000ff',
+                targetColor: '#000000',
+                tolerance: 50
+            }
+        }
+    })
 }
 </script>
 
