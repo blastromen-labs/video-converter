@@ -183,6 +183,18 @@ watch(() => props.isPlaying, (newValue) => {
 
 const streamingActive = ref(false)
 
+// Add video loop functionality
+const handleVideoEnded = () => {
+    if (videoRef.value) {
+        // Reset to start time (considering trim settings)
+        videoRef.value.currentTime = props.trimSettings?.enabled ? props.trimSettings.start : 0
+        // If it was playing, start playing again
+        if (props.isPlaying) {
+            videoRef.value.play()
+        }
+    }
+}
+
 onMounted(() => {
     if (videoRef.value) {
         videoRef.value.addEventListener('loadeddata', handleVideoLoaded)
@@ -193,18 +205,18 @@ onMounted(() => {
         // Use function references for consistent event handling
         const handlePlay = () => emit('update:isPlaying', true)
         const handlePause = () => emit('update:isPlaying', false)
-        const handleEnded = () => emit('update:isPlaying', false)
+        // Replace default ended handler with our loop handler
+        videoRef.value.addEventListener('ended', handleVideoEnded)
 
         videoRef.value.addEventListener('play', handlePlay)
         videoRef.value.addEventListener('pause', handlePause)
-        videoRef.value.addEventListener('ended', handleEnded)
 
         // Clean up event listeners on unmount
         onUnmounted(() => {
             if (videoRef.value) {
                 videoRef.value.removeEventListener('play', handlePlay)
                 videoRef.value.removeEventListener('pause', handlePause)
-                videoRef.value.removeEventListener('ended', handleEnded)
+                videoRef.value.removeEventListener('ended', handleVideoEnded)
             }
         })
     }
@@ -226,6 +238,7 @@ const videoAttrs = computed(() => ({
     preload: 'auto',
     crossorigin: 'anonymous',
     playsinline: true,
+    loop: true,  // Enable native video looping
     ...(props.trimSettings?.enabled ? {
         min: props.trimSettings.start,
         max: props.trimSettings.end
