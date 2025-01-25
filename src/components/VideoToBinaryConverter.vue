@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted, onMounted } from 'vue'
 import VideoPreview from './VideoPreview.vue'
 import TrimVideo from './TrimVideo.vue'
 import OutputSettings from './OutputSettings.vue'
@@ -718,7 +718,23 @@ const processPixel = (r, g, b) => {
   return [rr, gg, bb]
 }
 
+// Add streaming state at component level
+const streamingActive = ref(false)
+
+onMounted(() => {
+  window.addEventListener('streaming-started', () => streamingActive.value = true)
+  window.addEventListener('streaming-stopped', () => streamingActive.value = false)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('streaming-started', () => streamingActive.value = true)
+  window.removeEventListener('streaming-stopped', () => streamingActive.value = false)
+})
+
 const processVideoFrame = (imageData) => {
+  // Skip processing if streaming is active
+  if (streamingActive.value) return
+
   const data = imageData.data
   const len = data.length
 
@@ -812,17 +828,12 @@ const isPlaying = ref(false)
 <template>
   <div class="min-h-screen bg-app-bg">
     <Navbar v-model:target-resolution="targetResolution" v-model:adjustments="adjustments"
-      v-model:trim-settings="trimSettings" :default-settings="{
-        resolution: DEFAULT_SETTINGS.resolution,
-        adjustments: DEFAULT_SETTINGS.adjustments
-      }" :video-metadata="videoMetadata" />
+      v-model:trim-settings="trimSettings" :default-settings="DEFAULT_SETTINGS" :video-metadata="videoMetadata" />
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <div class="grid grid-cols-1 lg:grid-cols-[450px,1fr] gap-6">
         <OutputSettings v-model:adjustments="adjustments" v-model:trim-settings="trimSettings"
-          v-model:target-resolution="targetResolution" :video-metadata="videoMetadata" :default-settings="{
-            resolution: DEFAULT_SETTINGS.resolution,
-            adjustments: DEFAULT_SETTINGS.adjustments
-          }" />
+          v-model:target-resolution="targetResolution" :video-metadata="videoMetadata"
+          :default-settings="DEFAULT_SETTINGS" />
 
         <div class="flex flex-col gap-6">
           <!-- Preview Section -->

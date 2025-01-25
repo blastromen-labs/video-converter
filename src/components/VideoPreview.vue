@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted, computed, watchEffect } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed, watchEffect, shallowRef } from 'vue'
 
 const cropToAspectRatio = (sourceWidth, sourceHeight, targetWidth, targetHeight) => {
     // Calculate target aspect ratio from output dimensions
@@ -59,6 +59,15 @@ const computedDimensions = computed(() => {
 })
 
 const updatePreview = async () => {
+    // Stop all preview updates if streaming is active
+    if (streamingActive.value) {
+        if (frameRequestId) {
+            cancelAnimationFrame(frameRequestId)
+            frameRequestId = null
+        }
+        return
+    }
+
     if (!videoRef.value || !canvasRef.value || !videoRef.value.readyState >= 2) return
 
     const ctx = canvasRef.value.getContext('2d', { willReadFrequently: true })
@@ -80,6 +89,9 @@ const updatePreview = async () => {
 }
 
 const startPreviewLoop = () => {
+    // Don't start preview loop if streaming is active
+    if (streamingActive.value) return
+
     if (frameRequestId) cancelAnimationFrame(frameRequestId)
     frameRequestId = requestAnimationFrame(() => {
         updatePreview()
@@ -169,6 +181,8 @@ watch(() => props.isPlaying, (newValue) => {
     }
 }, { immediate: true })
 
+const streamingActive = ref(false)
+
 onMounted(() => {
     if (videoRef.value) {
         videoRef.value.addEventListener('loadeddata', handleVideoLoaded)
@@ -194,6 +208,8 @@ onMounted(() => {
             }
         })
     }
+    window.addEventListener('streaming-started', handleStreamingStarted)
+    window.addEventListener('streaming-stopped', handleStreamingEnded)
 })
 
 // Watch for changes in trim settings
@@ -224,6 +240,8 @@ onUnmounted(() => {
     if (videoRef.value) {
         videoRef.value.removeEventListener('loadeddata', handleVideoLoaded)
     }
+    window.removeEventListener('streaming-started', handleStreamingStarted)
+    window.removeEventListener('streaming-stopped', handleStreamingEnded)
 })
 
 watch(() => props.videoUrl, () => {
@@ -235,6 +253,32 @@ watch(() => props.videoUrl, () => {
         startPreviewLoop()
     }
 })
+
+const handleStreamingStarted = () => {
+    streamingActive.value = true
+    // Cancel any existing animation frame
+    if (frameRequestId) {
+        cancelAnimationFrame(frameRequestId)
+        frameRequestId = null
+    }
+    // Clear the canvas
+    if (canvasRef.value) {
+        const ctx = canvasRef.value.getContext('2d')
+        ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+    }
+    if (props.isPlaying) {
+        videoRef.value.pause()
+        emit('update:isPlaying', false)
+    }
+}
+
+const handleStreamingEnded = () => {
+    streamingActive.value = false
+    // Restart preview loop if video is loaded
+    if (videoRef.value && videoRef.value.readyState >= 2) {
+        startPreviewLoop()
+    }
+}
 </script>
 
 <template>
